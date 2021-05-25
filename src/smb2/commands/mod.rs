@@ -28,8 +28,10 @@
  */
 extern crate bytes;
 
-use bytes::Buf;
-
+// locals
+use super::Client;
+// deps
+use bytes::{BufMut, Bytes, BytesMut};
 /// ## Encode
 ///
 /// The encode traits must be implemented by all the commands and requires to implement a method which encodes the command into
@@ -38,5 +40,46 @@ pub trait Encode {
     /// ### encode
     ///
     /// Encode the command
-    fn encode(&self) -> dyn Buf;
+    fn encode(&self) -> Bytes;
+
+    /// ### get_command_Id
+    ///
+    /// Returns the command ID
+    fn get_command_id(&self) -> u16;
+}
+
+/// ## Encoder
+///
+/// The encoder, as the name suggests, encode a message
+pub struct Encoder;
+
+impl Default for Encoder {
+    fn default() -> Self {
+        Encoder {}
+    }
+}
+
+impl Encoder {
+    /// ### encode
+    ///
+    /// Encode a message
+    pub async fn encode(&self, command: &dyn Encode, client: &Client) -> Bytes {}
+
+    /// ### encode_header
+    async fn encode_header(&self, command: &dyn Encode, client: &Client) -> Bytes {
+        let mut header: BytesMut = BytesMut::with_capacity(64);
+        header.put_u32(0x424D54FE); // Protocol ID
+        header.put_u16(64); // Structure size
+        header.put_u16(0); // Credit charge
+        header.put_u32(0); // Status
+        header.put_u16(command.get_command_id()); // Command
+        header.put_u16(0); // Credit request
+                           // TODO: flags --> header.put_u32(client.get_flags());
+        header.put_u32(0); // next command
+                           // TODO: generate UUID
+                           // TODO: async id
+                           // TODO: session id
+                           // TODO: signature
+        header.freeze()
+    }
 }
