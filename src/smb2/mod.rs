@@ -1,23 +1,6 @@
-//! # Pavão
+//! # smb2
 //!
-//! [Pavão](https://github.com/veeso/pavao) is a Rust native async client library for SMB2/SMB3
-//!
-//! ## Get Started
-//!
-//! ### Adding `pavao` to your cargo toml dependencies:
-//!
-//! ```toml
-//! pavao = "0.1.0"
-//! ```
-//!
-
-#![doc(html_playground_url = "https://play.rust-lang.org")]
-#![doc(
-    html_favicon_url = "https://raw.githubusercontent.com/veeso/pavao/main/docs/images/cargo/pavao-128.png"
-)]
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/veeso/pavao/main/docs/images/cargo/pavao-512.png"
-)]
+//! exposes the client for SMB2/3
 
 /**
  * MIT License
@@ -42,9 +25,20 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+// sub modules
+pub mod builder;
+mod commands;
+pub mod errors;
 
-// deps
-#[macro_use]
-extern crate num_derive;
-// modules
-pub mod smb2;
+// expose
+pub use builder::ClientBuilder;
+pub use errors::{Error, ErrorCode};
+
+// types
+pub type SmbResult<T> = Result<T, Error>;
+
+/// ## Client
+///
+/// SMB2/3 client. This is the only struct the client must use in order to connect with the remote server
+#[derive(Debug)]
+pub struct Client {}
