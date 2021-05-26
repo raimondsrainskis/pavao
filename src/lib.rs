@@ -42,9 +42,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
 // deps
+extern crate async_net;
+#[macro_use]
+extern crate bitflags;
+extern crate bytes;
+#[macro_use]
+extern crate log;
+extern crate num;
 #[macro_use]
 extern crate num_derive;
+#[macro_use]
+extern crate thiserror;
 // modules
 pub mod smb2;

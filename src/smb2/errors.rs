@@ -25,7 +25,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-extern crate num;
 // deps
 use std::convert::TryFrom;
 use thiserror::Error;
@@ -552,5 +551,38 @@ impl TryFrom<u32> for ErrorCode {
             Some(err) => Ok(err),
             None => Err("Unknown status code"),
         }
+    }
+}
+
+impl From<ErrorCode> for u32 {
+    fn from(code: ErrorCode) -> u32 {
+        code as u32
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_smb2_errors_errorcode() {
+        // Try from
+        assert_eq!(
+            ErrorCode::try_from(0x8000002d).ok().unwrap(),
+            ErrorCode::StoppedOnSymlink
+        );
+        assert_eq!(
+            ErrorCode::try_from(0x00000000).ok().unwrap(),
+            ErrorCode::Success
+        );
+        assert_eq!(
+            ErrorCode::try_from(0xf0f0f0f0).err().unwrap(),
+            "Unknown status code"
+        );
+        // To u32
+        assert_eq!(From::from(ErrorCode::Success), 0);
+        assert_eq!(From::from(ErrorCode::StoppedOnSymlink), 0x8000002d);
     }
 }
