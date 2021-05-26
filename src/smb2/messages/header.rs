@@ -1,7 +1,6 @@
-//! # command
+//! # header
 //!
-//! this modules is internal and contains all the commands designed in the SMB2 protocol
-//! in addition it provides the `Encode` trait
+//! this modules defines the smb2 protocol header
 
 /**
  * MIT License
@@ -26,65 +25,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-// locals
-use super::Client;
-use super::ErrorCode;
-// deps
+use super::{Client, Encode, ErrorCode};
 use bytes::{BufMut, Bytes, BytesMut};
-
-// traits
-
-/// ## Command
-///
-/// The Command trait describes the methods a command must implement
-trait Command: Encode {
-    /// ### get_command_Id
-    ///
-    /// Returns the command ID
-    fn get_command_id(&self) -> u16;
-}
-
-/// ## Encode
-///
-/// The encode traits must be implemented by all the commands and requires to implement a method which encodes the command into
-/// a buffer
-trait Encode {
-    /// ### encode
-    ///
-    /// Encode the command
-    fn encode(&self) -> Bytes;
-}
-
-// encoder
-
-/// ## Encoder
-///
-/// The encoder, as the name suggests, encode a message
-pub struct Encoder;
-
-impl Default for Encoder {
-    fn default() -> Self {
-        Encoder {}
-    }
-}
-
-impl Encoder {
-    /// ### encode
-    ///
-    /// Encode a message
-    pub async fn encode(&self, command: &dyn Command, client: &Client) -> Bytes {
-        // Create header
-        let header: Bytes = Header::new(client, command.get_command_id()).encode();
-        Bytes::new() // TODO: replace
-    }
-}
-
-// header
 
 /// ## Header
 ///
 /// Message header
-struct Header {
+pub struct Header {
     protocol_id: u32,
     struct_size: u16,
     credit_charge: u16,

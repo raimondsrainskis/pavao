@@ -27,8 +27,8 @@
  */
 // sub modules
 pub mod builder;
-mod commands;
 pub mod errors;
+mod messages;
 
 // expose
 pub use builder::ClientBuilder;
