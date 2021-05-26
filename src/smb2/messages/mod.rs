@@ -40,7 +40,7 @@ mod header;
 /// ## Command
 ///
 /// The Command trait describes the methods a command must implement
-trait Command: Encode {
+pub trait Command: Encode {
     /// ### get_command_Id
     ///
     /// Returns the command ID
@@ -51,7 +51,7 @@ trait Command: Encode {
 ///
 /// The encode traits must be implemented by all the commands and requires to implement a method which encodes the command into
 /// a buffer
-trait Encode {
+pub trait Encode {
     /// ### encode
     ///
     /// Encode the command

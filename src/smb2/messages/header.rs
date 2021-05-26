@@ -28,6 +28,21 @@
 use super::{Client, Encode, ErrorCode};
 use bytes::{BufMut, Bytes, BytesMut};
 
+bitflags! {
+    /// ## Flags
+    ///
+    /// Describes header flags
+    struct Flags: u32 {
+        const FLAGS_SERVER_TO_REDIR = 0x00000001;
+        const FLAGS_ASYNC_COMMAND = 0x00000002;
+        const FLAGS_RELATED_OPERATIONS = 0x00000004;
+        const FLAGS_SIGNED = 0x00000008;
+        const FLAGS_PRIORITY_MASK = 0x00000070;
+        const FLAGS_DFS_OPERATIONS = 0x10000000;
+        const FLAGS_REPLAY_OPERATION = 0x20000000;
+    }
+}
+
 /// ## Header
 ///
 /// Message header
@@ -38,12 +53,12 @@ pub struct Header {
     status: ErrorCode,
     command_id: u16,
     credit_request: u16,
-    flags: u32, // FIXME: is Flags
+    flags: Flags,
     next_command: u32,
-    message_id: String, // FIXME: verify (maybe u64)
-    async_id: String,   // FIXME: verify (maybe u64)
-    session_id: String, // FIXME: verify (maybe u64)
-    signature: String,  // FIXME: verify (maybe u128)
+    message_id: u64,
+    async_id: u64,
+    session_id: u64,
+    signature: String,
 }
 
 impl Header {
@@ -58,12 +73,12 @@ impl Header {
             status: ErrorCode::Success,
             command_id,
             credit_request: 0,
-            flags: 0, // FIXME:
+            flags: Flags::empty(), // FIXME:
             next_command: 0,
-            message_id: String::new(), // FIXME:
-            async_id: String::new(),   // FIXME:
-            session_id: String::new(), // FIXME:
-            signature: String::new(),  // FIXME:
+            message_id: client.message_id,
+            async_id: client.async_id,
+            session_id: client.session_id,
+            signature: String::new(), // FIXME:
         }
     }
 }
@@ -77,12 +92,12 @@ impl Encode for Header {
         header.put_u32(From::from(self.status)); // Status
         header.put_u16(self.command_id); // Command
         header.put_u16(self.credit_request); // Credit request
-                                             // TODO: flags --> header.put_u32(client.get_flags());
+        header.put_u32(self.flags.bits());
         header.put_u32(self.next_command); // next command
-                                           // TODO: generate UUID
-                                           // TODO: async id
-                                           // TODO: session id
-                                           // TODO: signature
+        header.put_u64(self.message_id);
+        header.put_u64(self.async_id);
+        header.put_u64(self.session_id);
+        // TODO: signature
         header.freeze()
     }
 }
