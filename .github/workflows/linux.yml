@@ -8,13 +8,15 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ubuntu:20.10
+    container: debian:buster
 
     services:
       samba:
         image: dperson/samba
 
     steps:
+      - name: install dependencies
+        run: apt update && apt install -y build-essential curl wget
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
