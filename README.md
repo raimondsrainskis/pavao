@@ -6,7 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-teal.svg)](https://opensource.org/licenses/MIT) [![Stars](https://img.shields.io/github/stars/veeso/pavao.svg)](https://github.com/veeso/pavao) [![Downloads](https://img.shields.io/crates/d/pavao.svg)](https://crates.io/crates/pavao) [![Crates.io](https://img.shields.io/badge/crates.io-v0.1.0-orange.svg)](https://crates.io/crates/pavao) [![Docs](https://docs.rs/pavao/badge.svg)](https://docs.rs/pavao)  
 
-[![Build](https://github.com/veeso/pavao/workflows/Build/badge.svg)](https://github.com/veeso/pavao/actions) [![Coverage Status](https://coveralls.io/repos/github/veeso/pavao/badge.svg?branch=main)](https://coveralls.io/github/veeso/pavao?branch=main)
+[![Build](https://github.com/veeso/pavao/workflows/Linux/badge.svg)](https://github.com/veeso/pavao/actions) [![Build](https://github.com/veeso/pavao/workflows/MacOS/badge.svg)](https://github.com/veeso/pavao/actions) [![Build](https://github.com/veeso/pavao/workflows/Windows/badge.svg)](https://github.com/veeso/pavao/actions) [![Coverage Status](https://coveralls.io/repos/github/veeso/pavao/badge.svg?branch=main)](https://coveralls.io/github/veeso/pavao?branch=main)
 
 Developed by Christian Visintin  
 Current version: 0.1.0 FIXME: ()
