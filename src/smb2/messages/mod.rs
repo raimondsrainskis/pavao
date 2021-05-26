@@ -26,14 +26,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-// locals
-use super::Client;
-use super::ErrorCode;
-// deps
-use bytes::{BufMut, Bytes, BytesMut};
-
 // modules
+mod error;
 mod header;
+// locals
+use super::ErrorCode;
+use super::{Client, SmbResult};
+use error::ErrorResponse;
+use header::Header;
+// deps
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 // traits
 
@@ -63,6 +65,7 @@ pub trait Encode {
 /// ## Encoder
 ///
 /// The encoder, as the name suggests, encode a message
+#[derive(Debug)]
 pub struct Encoder;
 
 impl Default for Encoder {
@@ -77,7 +80,38 @@ impl Encoder {
     /// Encode a message
     pub async fn encode(&self, command: &dyn Command, client: &Client) -> Bytes {
         // Create header
-        let header: Bytes = header::Header::new(client, command.get_command_id()).encode();
+        let header: Bytes = Header::new(client, command.get_command_id()).encode();
         Bytes::new() // TODO: replace
     }
+}
+
+// decoder
+
+/// ## Response
+///
+/// Represents a SMB2 response
+#[derive(Debug)]
+pub struct Response {
+    header: Header,
+    error: Option<ErrorResponse>,
+    data: Bytes,
+}
+
+/// ## Decoder
+///
+/// The decoder, as the name suggests, is used to decode messages
+#[derive(Debug)]
+pub struct Decoder;
+
+impl Default for Decoder {
+    fn default() -> Self {
+        Decoder {}
+    }
+}
+
+impl Decoder {
+    /// ### decode
+    ///
+    /// Decode incoming buffer
+    pub async fn decode(&self, buff: &dyn Buf) -> SmbResult<Response> {}
 }

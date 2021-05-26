@@ -25,8 +25,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-use super::{Client, Encode, ErrorCode};
-use bytes::{BufMut, Bytes, BytesMut};
+use super::{Client, Encode, ErrorCode, SmbResult};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 bitflags! {
     /// ## Flags
@@ -46,6 +46,7 @@ bitflags! {
 /// ## Header
 ///
 /// Message header
+#[derive(Debug)]
 pub struct Header {
     protocol_id: u32,
     struct_size: u16,
@@ -81,6 +82,11 @@ impl Header {
             signature: String::new(), // FIXME:
         }
     }
+
+    /// ### decode
+    ///
+    /// Try to decode a buffer into a `Header`
+    pub async fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
 }
 
 impl Encode for Header {
