@@ -87,6 +87,16 @@ impl Encoder {
 
 // decoder
 
+/// ## Decode
+///
+/// The Decode trait must be implemented by all the data types which must be decoded, since received as response from the server
+pub trait Decode: Sized {
+    /// ### decode
+    ///
+    /// Try to decode buff into `Self`
+    fn decode(buff: &dyn Buf) -> SmbResult<Self>;
+}
+
 /// ## Response
 ///
 /// Represents a SMB2 response

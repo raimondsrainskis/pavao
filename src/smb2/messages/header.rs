@@ -25,7 +25,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-use super::{Client, Encode, ErrorCode, SmbResult};
+use super::{Client, Decode, Encode, ErrorCode, SmbResult};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 bitflags! {
@@ -106,4 +106,8 @@ impl Encode for Header {
         // TODO: signature
         header.freeze()
     }
+}
+
+impl Decode for Header {
+    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
 }

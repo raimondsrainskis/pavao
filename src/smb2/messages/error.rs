@@ -26,9 +26,9 @@
  * SOFTWARE.
  */
 // locals
-//use super::Encode; TODO: Decode
+use super::{Decode, SmbResult};
 // deps
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use std::convert::TryFrom;
 use std::path::PathBuf;
 
@@ -44,7 +44,9 @@ pub struct ErrorResponse {
     error_data: Vec<ErrorContext>,
 }
 
-// TODO: decode error response
+impl Decode for ErrorResponse {
+    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+}
 
 /// ## ErrorContext
 ///
@@ -54,6 +56,10 @@ pub struct ErrorContext {
     data_length: u32,
     error_id: ErrorId,
     data: Vec<ErrorContextData>,
+}
+
+impl Decode for ErrorContext {
+    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
 }
 
 /// ## ErrorCode
@@ -87,6 +93,10 @@ pub enum ErrorContextData {
     BufferTooSmall(u32),
 }
 
+impl Decode for ErrorContextData {
+    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+}
+
 /// ## SymbolicLinkError
 ///
 /// The Symbolic Link Error Response is used to indicate that a symbolic link was encountered on create;
@@ -115,6 +125,10 @@ bitflags! {
     }
 }
 
+impl Decode for SymbolicLinkError {
+    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+}
+
 /// ## ShareRedirectError
 ///
 /// Servers which negotiate SMB 3.1.1 or higher can return this error context to a client in response to a
@@ -131,6 +145,10 @@ pub struct ShareRedirectError {
     ip_addr_count: u32,
     ip_addr_move_list: Vec<MoveDstIpAddr>,
     resource_name: String,
+}
+
+impl Decode for ShareRedirectError {
+    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
 }
 
 /// ## MoveDstIpAddr
@@ -152,6 +170,10 @@ bitflags! {
         const V4 = 0x00000001;
         const V6 = 0x00000002;
     }
+}
+
+impl Decode for MoveDstIpAddr {
+    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
 }
 
 #[cfg(test)]
