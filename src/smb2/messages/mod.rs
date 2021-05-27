@@ -30,12 +30,12 @@
 mod error;
 mod header;
 // locals
-use super::ErrorCode;
 use super::{Client, SmbResult};
+use super::{Error, ErrorCode};
 use error::ErrorResponse;
-use header::Header;
+use header::AsyncHeader;
 // deps
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Buf, Bytes};
 
 // traits
 
@@ -78,9 +78,9 @@ impl Encoder {
     /// ### encode
     ///
     /// Encode a message
-    pub async fn encode(&self, command: &dyn Command, client: &Client) -> Bytes {
+    pub async fn encode(&self, client: &Client, command: &dyn Command) -> Bytes {
         // Create header
-        let header: Bytes = Header::new(client, command.get_command_id()).encode();
+        let header: Bytes = AsyncHeader::new(client, command.get_command_id()).encode();
         Bytes::new() // TODO: replace
     }
 }
@@ -102,9 +102,9 @@ pub trait Decode: Sized {
 /// Represents a SMB2 response
 #[derive(Debug)]
 pub struct Response {
-    header: Header,
-    error: Option<ErrorResponse>,
-    data: Bytes,
+    header: AsyncHeader,
+    error: Option<ErrorResponse>, // CHECK: data might become a variant between ErrorResponse and Bytes
+    data: Bytes,                  // NOTE: Remaining bytes; must be decoded by calling method
 }
 
 /// ## Decoder
@@ -123,5 +123,14 @@ impl Decoder {
     /// ### decode
     ///
     /// Decode incoming buffer
-    pub async fn decode(&self, buff: &dyn Buf) -> SmbResult<Response> {}
+    pub async fn decode(&self, buff: &mut dyn Buf) -> SmbResult<Response> {
+        let header: AsyncHeader = AsyncHeader::decode(buff)?;
+        // TODO: check error???
+        let error: Option<ErrorResponse> = None;
+        Ok(Response {
+            header,
+            error,
+            data: buff.copy_to_bytes(buff.remaining()),
+        })
+    }
 }
