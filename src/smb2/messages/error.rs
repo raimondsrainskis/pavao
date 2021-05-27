@@ -45,7 +45,7 @@ pub struct ErrorResponse {
 }
 
 impl Decode for ErrorResponse {
-    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+    fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {}
 }
 
 /// ## ErrorContext
@@ -59,7 +59,7 @@ pub struct ErrorContext {
 }
 
 impl Decode for ErrorContext {
-    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+    fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {}
 }
 
 /// ## ErrorCode
@@ -94,7 +94,7 @@ pub enum ErrorContextData {
 }
 
 impl Decode for ErrorContextData {
-    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+    fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {}
 }
 
 /// ## SymbolicLinkError
@@ -126,7 +126,7 @@ bitflags! {
 }
 
 impl Decode for SymbolicLinkError {
-    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+    fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {}
 }
 
 /// ## ShareRedirectError
@@ -148,7 +148,7 @@ pub struct ShareRedirectError {
 }
 
 impl Decode for ShareRedirectError {
-    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+    fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {}
 }
 
 /// ## MoveDstIpAddr
@@ -173,7 +173,7 @@ bitflags! {
 }
 
 impl Decode for MoveDstIpAddr {
-    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+    fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {}
 }
 
 #[cfg(test)]

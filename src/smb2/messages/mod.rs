@@ -94,7 +94,7 @@ pub trait Decode: Sized {
     /// ### decode
     ///
     /// Try to decode buff into `Self`
-    fn decode(buff: &dyn Buf) -> SmbResult<Self>;
+    fn decode(buff: &mut dyn Buf) -> SmbResult<Self>;
 }
 
 /// ## Response

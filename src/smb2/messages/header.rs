@@ -86,7 +86,7 @@ impl Header {
     /// ### decode
     ///
     /// Try to decode a buffer into a `Header`
-    pub async fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+    pub async fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {}
 }
 
 impl Encode for Header {
@@ -109,5 +109,5 @@ impl Encode for Header {
 }
 
 impl Decode for Header {
-    fn decode(buff: &dyn Buf) -> SmbResult<Self> {}
+    fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {}
 }
