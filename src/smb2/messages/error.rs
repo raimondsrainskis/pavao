@@ -26,9 +26,10 @@
  * SOFTWARE.
  */
 // locals
-use super::{Decode, SmbResult};
+use super::{Decode, Error, ErrorCode, SmbResult};
+use crate::utils::buffer::align_8_bytes_boundary;
 // deps
-use bytes::{Buf, Bytes, BytesMut};
+use bytes::Buf;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 
@@ -38,14 +39,40 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub struct ErrorResponse {
     struct_size: u16,
-    error_ctx_count: u8,
+    ctx_count: u8,
     // rfu 8
     byte_count: u32,
     error_data: Vec<ErrorContext>,
 }
 
-impl Decode for ErrorResponse {
-    fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {}
+impl ErrorResponse {
+    pub fn decode(buff: &mut dyn Buf, error_code: ErrorCode) -> SmbResult<Self> {
+        if buff.remaining() < 8 {
+            // Min len
+            return Err(Error::InvalidSyntax);
+        }
+        let struct_size: u16 = buff.get_u16();
+        let ctx_count: u8 = buff.get_u8();
+        buff.advance(1); // RFU
+        let byte_count: u32 = buff.get_u32();
+        // Verify length for error_data
+        if buff.remaining() < byte_count as usize {
+            return Err(Error::InvalidSyntax);
+        }
+        // Collect error data
+        let mut error_data: Vec<ErrorContext> = Vec::with_capacity(ctx_count as usize);
+        for _ in 0..ctx_count {
+            error_data.push(ErrorContext::decode(buff, error_code)?);
+            // 8-byte padding
+            align_8_bytes_boundary(buff);
+        }
+        Ok(ErrorResponse {
+            struct_size,
+            ctx_count,
+            byte_count,
+            error_data,
+        })
+    }
 }
 
 /// ## ErrorContext
@@ -58,14 +85,22 @@ pub struct ErrorContext {
     data: Vec<ErrorContextData>,
 }
 
-impl Decode for ErrorContext {
-    fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {}
+impl ErrorContext {
+    pub fn decode(buff: &mut dyn Buf, error_code: ErrorCode) -> SmbResult<Self> {
+        if buff.remaining() < 8 {
+            return Err(Error::InvalidSyntax);
+        }
+        let data_length: u32 = buff.get_u32();
+        let error_id: ErrorId = match ErrorId::try_from(buff.get_u32()) {
+            Ok(id) => id,
+            Err(_) => return Err(Error::InvalidSyntax),
+        };
+    }
 }
 
-/// ## ErrorCode
+/// ## ErrorId
 ///
-/// Describes an error returned in state. For SMB2 the values are listed here:
-/// <https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55>
+/// An identifier for the error context.
 #[derive(Clone, Copy, Debug, FromPrimitive, PartialEq, Eq)]
 pub enum ErrorId {
     Smb2ErrorIdDefault = 0x00000000,

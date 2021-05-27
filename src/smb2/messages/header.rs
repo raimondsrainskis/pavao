@@ -52,7 +52,7 @@ pub struct AsyncHeader {
     protocol_id: u32,
     struct_size: u16,
     credit_charge: u16,
-    status: ErrorCode,
+    pub status: ErrorCode,
     command_id: u16,
     credit_request: u16,
     flags: Flags,

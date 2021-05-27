@@ -37,6 +37,8 @@ use thiserror::Error;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     ServerError(ErrorCode),
+    InvalidSyntax,
+    UnknownErrorCode,
 }
 
 /// ## ErrorCode

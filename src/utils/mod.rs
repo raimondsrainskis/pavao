@@ -1,23 +1,6 @@
-//! # Pavão
+//! # utils
 //!
-//! [Pavão](https://github.com/veeso/pavao) is a Rust native async client library for SMB2/SMB3
-//!
-//! ## Get Started
-//!
-//! ### Adding `pavao` to your cargo toml dependencies:
-//!
-//! ```toml
-//! pavao = "0.1.0"
-//! ```
-//!
-
-#![doc(html_playground_url = "https://play.rust-lang.org")]
-#![doc(
-    html_favicon_url = "https://raw.githubusercontent.com/veeso/pavao/main/docs/images/cargo/pavao-128.png"
-)]
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/veeso/pavao/main/docs/images/cargo/pavao-512.png"
-)]
+//! utils module
 
 /**
  * MIT License
@@ -42,18 +25,4 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-// deps
-extern crate async_net;
-#[macro_use]
-extern crate bitflags;
-extern crate bytes;
-#[macro_use]
-extern crate log;
-extern crate num;
-#[macro_use]
-extern crate num_derive;
-#[macro_use]
-extern crate thiserror;
-// modules
-pub mod smb2;
-mod utils;
+pub mod buffer;
