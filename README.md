@@ -32,11 +32,9 @@ Current version: 0.1.0 FIXME: ()
 
 Pavão (/pɐ.ˈvɐ̃w̃/) is a Rust native async client library for SMB version 2 and 3.
 
-And that's also explains the reason of the name: Realm stands for React and Elm.
+TODO: complete
 
-pavao also comes with a built-in standard library of components you may find very useful. Don't worry, they are optional if you don't want to use them 😉, just follow the guide in [get started](#get-started-).
-
-> Pavão |> Pavé |> Animal Crossing |> Carnival |> Samba |> SMB
+> Pavão |> Pavé |> Animal Crossing |> Carnival |> Rio De Janeiro |> Samba |> SMB
 
 ---
 
@@ -60,10 +58,7 @@ TODO:
 
 ## Guides 🎓
 
-- [Get Started Guide](docs/get-started.md)
-- [The UI lifecycle](docs/lifecycle.md)
-- [Standard Library Components](docs/std-components.md)
-- [Implement components](docs/new-components.md)
+TODO: complete
 
 ---
 
