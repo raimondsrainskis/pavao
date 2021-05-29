@@ -27,7 +27,6 @@
  */
 // locals
 use super::{Decode, Error, ErrorCode, SmbResult};
-use crate::utils::buffer::align_8_bytes_boundary;
 // deps
 use bytes::Buf;
 use std::convert::TryFrom;
@@ -60,11 +59,16 @@ impl ErrorResponse {
             return Err(Error::InvalidSyntax);
         }
         // Collect error data
+        let mut accumulator: usize = 8;
         let mut error_data: Vec<ErrorContext> = Vec::with_capacity(ctx_count as usize);
         for _ in 0..ctx_count {
+            let before: usize = buff.remaining();
             error_data.push(ErrorContext::decode(buff, error_code)?);
-            // 8-byte padding
-            align_8_bytes_boundary(buff);
+            // 8-byte align
+            accumulator += before - buff.remaining();
+            if accumulator % 8 != 0 {
+                buff.advance(accumulator % 8);
+            }
         }
         Ok(ErrorResponse {
             struct_size,
@@ -207,47 +211,51 @@ impl Decode for SymbolicLinkError {
             Some(f) => f,
             None => SymbolicLinkErrorFlags::empty(),
         };
-        let (substitute_name, print_name): (String, String) =
-            match substitute_name_offset < print_name_offset {
-                false => {
-                    let diff: usize = (print_name_offset - substitute_name_offset) as usize;
-                    // Advance
-                    buff.advance(substitute_name_offset as usize);
-                    let mut name_buff: Vec<u8> = vec![0; substitute_name_length as usize];
-                    buff.copy_to_slice(name_buff.as_mut_slice());
-                    let substitute_name: String = match std::str::from_utf8(name_buff.as_ref()) {
-                        Ok(s) => s.to_string(),
-                        Err(_) => String::new(),
-                    };
-                    buff.advance(diff);
-                    let mut name_buff: Vec<u8> = vec![0; print_name_length as usize];
-                    buff.copy_to_slice(name_buff.as_mut_slice());
-                    let print_name: String = match std::str::from_utf8(name_buff.as_ref()) {
-                        Ok(s) => s.to_string(),
-                        Err(_) => String::new(),
-                    };
-                    (substitute_name, print_name)
-                }
-                true => {
-                    let diff: usize = (substitute_name_offset - print_name_offset) as usize;
-                    buff.advance(diff);
-                    let mut name_buff: Vec<u8> = vec![0; print_name_length as usize];
-                    buff.copy_to_slice(name_buff.as_mut_slice());
-                    let print_name: String = match std::str::from_utf8(name_buff.as_ref()) {
-                        Ok(s) => s.to_string(),
-                        Err(_) => String::new(),
-                    };
-                    buff.advance(substitute_name_offset as usize);
-                    let mut name_buff: Vec<u8> = vec![0; substitute_name_length as usize];
-                    buff.copy_to_slice(name_buff.as_mut_slice());
-                    let substitute_name: String = match std::str::from_utf8(name_buff.as_ref()) {
-                        Ok(s) => s.to_string(),
-                        Err(_) => String::new(),
-                    };
+        let (substitute_name, print_name): (String, String) = match substitute_name_offset
+            < print_name_offset
+        {
+            false => {
+                let diff: usize =
+                    (substitute_name_offset - print_name_offset - print_name_length) as usize;
+                // Advance
+                buff.advance(print_name_offset as usize);
+                let mut name_buff: Vec<u8> = vec![0; print_name_length as usize];
+                buff.copy_to_slice(name_buff.as_mut_slice());
+                let print_name: String = match std::str::from_utf8(name_buff.as_ref()) {
+                    Ok(s) => s.to_string(),
+                    Err(_) => String::new(),
+                };
+                buff.advance(diff);
+                let mut name_buff: Vec<u8> = vec![0; substitute_name_length as usize];
+                buff.copy_to_slice(name_buff.as_mut_slice());
+                let substitute_name: String = match std::str::from_utf8(name_buff.as_ref()) {
+                    Ok(s) => s.to_string(),
+                    Err(_) => String::new(),
+                };
+                (substitute_name, print_name)
+            }
+            true => {
+                let diff: usize =
+                    (print_name_offset - substitute_name_offset - substitute_name_length) as usize;
+                // advance
+                buff.advance(substitute_name_offset as usize);
+                let mut name_buff: Vec<u8> = vec![0; substitute_name_length as usize];
+                buff.copy_to_slice(name_buff.as_mut_slice());
+                let substitute_name: String = match std::str::from_utf8(name_buff.as_ref()) {
+                    Ok(s) => s.to_string(),
+                    Err(_) => String::new(),
+                };
+                buff.advance(diff);
+                let mut name_buff: Vec<u8> = vec![0; print_name_length as usize];
+                buff.copy_to_slice(name_buff.as_mut_slice());
+                let print_name: String = match std::str::from_utf8(name_buff.as_ref()) {
+                    Ok(s) => s.to_string(),
+                    Err(_) => String::new(),
+                };
 
-                    (substitute_name, print_name)
-                }
-            };
+                (substitute_name, print_name)
+            }
+        };
         Ok(SymbolicLinkError {
             symlink_length,
             symlink_error_tag,
@@ -288,7 +296,6 @@ impl Decode for ShareRedirectError {
         if buff.remaining() < 48 {
             return Err(Error::InvalidSyntax);
         }
-        let start_index: usize = buff.remaining();
         let struct_size: u32 = buff.get_u32();
         let notification_type: u32 = buff.get_u32();
         let resource_name_offset: u32 = buff.get_u32();
@@ -304,7 +311,7 @@ impl Decode for ShareRedirectError {
             ip_addr_move_list.push(MoveDstIpAddr::decode(buff)?);
         }
         // Advance to offset
-        let offset: usize = (buff.remaining() - start_index) + (resource_name_offset as usize);
+        let offset: usize = (resource_name_offset as usize) - ((ip_addr_count as usize * 24) + 24);
         if buff.remaining() < offset + (resource_name_length as usize) {
             return Err(Error::InvalidSyntax);
         }
@@ -439,22 +446,27 @@ mod test {
     #[test]
     fn test_smb2_messages_error_redirect_error() {
         let mut buff: Bytes = Bytes::from(vec![
-            0x00, 0x00, 0x00, 48, 0x00, 0x00, 0x00, 3, 0, 0, 0, 100, 0, 0, 0, 4, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x02, // Header
+            0x00, 0x00, 0x00, 48, // struct size
+            0x00, 0x00, 0x00, 0x03, // Notification type
+            0, 0, 0, 76, // Resource name offset
+            0, 0, 0, 0x04, // Resource name length
+            0x00, 0x00, // RFU
+            0x00, 0x00, // Target type
+            0x00, 0x00, 0x00, 0x02, // IP addr count
             0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x20, 0x01, 0x0d, 0xb8, 0x85, 0xa3,
             0x00, 0x00, 0x00, 0x00, 0x8a, 0x2e, 0x03, 0x70, 0x73, 0x34, // Ipv6
             0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0xc0, 0xa8, 0x01, 0xfe, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // IPv4
             0x00, 0x00, 0x00, 0x00, // Offset 4
-            0x43, 0x73, 0x65, 0x79, // CIAO
+            0x43, 0x49, 0x41, 0x4F, // CIAO
         ]);
         let decoded: ShareRedirectError = ShareRedirectError::decode(&mut buff).ok().unwrap();
         assert_eq!(decoded.ip_addr_count, 2);
         assert_eq!(decoded.ip_addr_move_list.len(), 2);
-        assert_eq!(decoded.notification_type, 0);
+        assert_eq!(decoded.notification_type, 3);
         assert_eq!(decoded.resource_name.as_str(), "CIAO");
         assert_eq!(decoded.resource_name_length, 4);
-        assert_eq!(decoded.resource_name_offset, 4);
+        assert_eq!(decoded.resource_name_offset, 76);
         assert_eq!(decoded.struct_size, 48);
         assert_eq!(decoded.target_type, 0);
         // bad size 48
@@ -487,72 +499,79 @@ mod test {
     #[test]
     fn test_smb2_messages_error_symbolic_link() {
         let mut buff: Bytes = Bytes::from(vec![
-            0x00, 0x00, 0x00, 0x28, 0x4c, 0x4d, 0x59, 0x53, 0xa0, 0x00, 0x00, 0x0c, 0x00,
-            0x13, // rpd
-            0x00, 0x08, // upl
+            0x00, 0x00, 0x00, 0x23, // Symlink length (38 - 4)
+            0x4c, 0x4d, 0x59, 0x53, // Tag
+            0xa0, 0x00, 0x00, 0x0c, // Reparse tag
+            0x00, 0x21, // reparse length
+            0x00, 0xa0, // upl
             0x00, 0x00, // sno
             0x00, 0x04, // snl
             0x00, 0x06, // pno
-            0x00, 0x04, // pnl
+            0x00, 0x05, // pnl
             0x00, 0x00, 0x00, 0x00, // Flags
-            0x43, 0x73, 0x65, 0x79, // substitute (CIAO)
+            0x43, 0x49, 0x41, 0x4F, // substitute (CIAO)
             0x00, 0x00, // offset
-            0x79, 0x65, 0x73, 0x43, // print (OAIC)
+            0x4F, 0x41, 0x49, 0x43, 0x43, // print (OAICC)
         ]);
         let decoded: SymbolicLinkError = SymbolicLinkError::decode(&mut buff).ok().unwrap();
         assert_eq!(decoded.flags, SymbolicLinkErrorFlags::ABSOLUTE);
-        assert_eq!(decoded.print_name.as_str(), "OAIC");
-        assert_eq!(decoded.print_name_length, 4);
+        assert_eq!(decoded.print_name.as_str(), "OAICC");
+        assert_eq!(decoded.print_name_length, 5);
         assert_eq!(decoded.print_name_offset, 6);
-        assert_eq!(decoded.reparse_length, 0x13);
+        assert_eq!(decoded.reparse_length, 0x21);
         assert_eq!(decoded.reparse_tag, 0xA000000C);
         assert_eq!(decoded.substitute_name.as_str(), "CIAO");
         assert_eq!(decoded.substitute_name_length, 4);
         assert_eq!(decoded.substitute_name_offset, 0);
         assert_eq!(decoded.symlink_error_tag, 0x4C4D5953);
-        assert_eq!(decoded.symlink_length, 0x28);
+        assert_eq!(decoded.symlink_length, 0x23);
         // Variant
         let mut buff: Bytes = Bytes::from(vec![
-            0x00, 0x00, 0x00, 0x28, 0x4c, 0x4d, 0x59, 0x53, 0xa0, 0x00, 0x00, 0x0c, 0x00,
-            0x13, // rpd
-            0x00, 0x08, // upl
+            0x00, 0x00, 0x00, 0x23, // Symlink length (38 - 4)
+            0x4c, 0x4d, 0x59, 0x53, // Tag
+            0xa0, 0x00, 0x00, 0x0c, // Reparse tag
+            0x00, 0x21, // reparse length
+            0x00, 0xa0, // upl
             0x00, 0x06, // sno
-            0x00, 0x04, // snl
+            0x00, 0x05, // snl
             0x00, 0x00, // pno
             0x00, 0x04, // pnl
             0x00, 0x00, 0x00, 0x00, // Flags
-            0x43, 0x73, 0x65, 0x79, // print (CIAO)
+            0x43, 0x49, 0x41, 0x4F, // print (CIAO)
             0x00, 0x00, // offset
-            0x79, 0x65, 0x73, 0x43, // sub (OAIC)
+            0x4F, 0x41, 0x49, 0x43, 0x43, // sub (OAIC)
         ]);
+        let decoded: SymbolicLinkError = SymbolicLinkError::decode(&mut buff).ok().unwrap();
         assert_eq!(decoded.flags, SymbolicLinkErrorFlags::ABSOLUTE);
         assert_eq!(decoded.print_name.as_str(), "CIAO");
         assert_eq!(decoded.print_name_length, 4);
         assert_eq!(decoded.print_name_offset, 0);
-        assert_eq!(decoded.reparse_length, 0x13);
+        assert_eq!(decoded.reparse_length, 0x21);
         assert_eq!(decoded.reparse_tag, 0xA000000C);
-        assert_eq!(decoded.substitute_name.as_str(), "OAIC");
-        assert_eq!(decoded.substitute_name_length, 4);
+        assert_eq!(decoded.substitute_name.as_str(), "OAICC");
+        assert_eq!(decoded.substitute_name_length, 5);
         assert_eq!(decoded.substitute_name_offset, 6);
         assert_eq!(decoded.symlink_error_tag, 0x4C4D5953);
-        assert_eq!(decoded.symlink_length, 0x28);
+        assert_eq!(decoded.symlink_length, 0x23);
     }
 
     #[test]
     fn test_smb2_messages_error_context_data() {
         // Symbolic Link
         let mut buff: Bytes = Bytes::from(vec![
-            0x00, 0x00, 0x00, 0x28, 0x4c, 0x4d, 0x59, 0x53, 0xa0, 0x00, 0x00, 0x0c, 0x00,
-            0x13, // rpd
-            0x00, 0x08, // upl
+            0x00, 0x00, 0x00, 0x23, // Symlink length (38 - 4)
+            0x4c, 0x4d, 0x59, 0x53, // Tag
+            0xa0, 0x00, 0x00, 0x0c, // Reparse tag
+            0x00, 0x21, // reparse length
+            0x00, 0xa0, // upl
             0x00, 0x00, // sno
             0x00, 0x04, // snl
             0x00, 0x06, // pno
-            0x00, 0x04, // pnl
+            0x00, 0x05, // pnl
             0x00, 0x00, 0x00, 0x00, // Flags
-            0x43, 0x73, 0x65, 0x79, // substitute (CIAO)
+            0x43, 0x49, 0x41, 0x4F, // substitute (CIAO)
             0x00, 0x00, // offset
-            0x79, 0x65, 0x73, 0x43, // print (OAIC)
+            0x4F, 0x41, 0x49, 0x43, 0x43, // print (OAICC)
         ]);
         let decoded: ErrorContextData =
             ErrorContextData::decode(&mut buff, ErrorCode::StoppedOnSymlink)
@@ -560,29 +579,34 @@ mod test {
                 .unwrap();
         if let ErrorContextData::SymbolicLink(decoded) = decoded {
             assert_eq!(decoded.flags, SymbolicLinkErrorFlags::ABSOLUTE);
-            assert_eq!(decoded.print_name.as_str(), "OAIC");
-            assert_eq!(decoded.print_name_length, 4);
+            assert_eq!(decoded.print_name.as_str(), "OAICC");
+            assert_eq!(decoded.print_name_length, 5);
             assert_eq!(decoded.print_name_offset, 6);
-            assert_eq!(decoded.reparse_length, 0x13);
+            assert_eq!(decoded.reparse_length, 0x21);
             assert_eq!(decoded.reparse_tag, 0xA000000C);
             assert_eq!(decoded.substitute_name.as_str(), "CIAO");
             assert_eq!(decoded.substitute_name_length, 4);
             assert_eq!(decoded.substitute_name_offset, 0);
             assert_eq!(decoded.symlink_error_tag, 0x4C4D5953);
-            assert_eq!(decoded.symlink_length, 0x28);
+            assert_eq!(decoded.symlink_length, 0x23);
         } else {
             panic!("Expected SymbolicLink");
         }
         // Share Redirect
         let mut buff: Bytes = Bytes::from(vec![
-            0x00, 0x00, 0x00, 48, 0x00, 0x00, 0x00, 3, 0, 0, 0, 100, 0, 0, 0, 4, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x02, // Header
+            0x00, 0x00, 0x00, 48, // struct size
+            0x00, 0x00, 0x00, 0x03, // Notification type
+            0, 0, 0, 76, // Resource name offset
+            0, 0, 0, 0x04, // Resource name length
+            0x00, 0x00, // RFU
+            0x00, 0x00, // Target type
+            0x00, 0x00, 0x00, 0x02, // IP addr count
             0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x20, 0x01, 0x0d, 0xb8, 0x85, 0xa3,
             0x00, 0x00, 0x00, 0x00, 0x8a, 0x2e, 0x03, 0x70, 0x73, 0x34, // Ipv6
             0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0xc0, 0xa8, 0x01, 0xfe, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // IPv4
             0x00, 0x00, 0x00, 0x00, // Offset 4
-            0x43, 0x73, 0x65, 0x79, // CIAO
+            0x43, 0x49, 0x41, 0x4F, // CIAO
         ]);
         let decoded: ErrorContextData =
             ErrorContextData::decode(&mut buff, ErrorCode::BadNetworkName)
@@ -591,10 +615,10 @@ mod test {
         if let ErrorContextData::ShareRedirect(decoded) = decoded {
             assert_eq!(decoded.ip_addr_count, 2);
             assert_eq!(decoded.ip_addr_move_list.len(), 2);
-            assert_eq!(decoded.notification_type, 0);
+            assert_eq!(decoded.notification_type, 3);
             assert_eq!(decoded.resource_name.as_str(), "CIAO");
             assert_eq!(decoded.resource_name_length, 4);
-            assert_eq!(decoded.resource_name_offset, 4);
+            assert_eq!(decoded.resource_name_offset, 76);
             assert_eq!(decoded.struct_size, 48);
             assert_eq!(decoded.target_type, 0);
         } else {
@@ -628,13 +652,13 @@ mod test {
         assert_eq!(decoded.data_length, 4);
         assert_eq!(decoded.error_id, ErrorId::Default);
         if let ErrorContextData::BufferTooSmall(buflen) = decoded.data {
-            assert_eq!(buflen, 256);
+            assert_eq!(buflen, 65535);
         } else {
             panic!("Expected BufferTooSmall");
         }
         // Bad
         let mut buff: Bytes = Bytes::from(vec![
-            0x00, 0x00, 0x00, 0x01, // data len
+            0x00, 0x00, 0x00, 0xff, // data len
             0x00, 0x00, 0x00, 0x00, // error id
             0x00, 0x00, 0xff, 0xff, // buffer too small
         ]);
@@ -647,11 +671,9 @@ mod test {
     fn test_smb2_messages_error_response() {
         let mut buff: Bytes = Bytes::from(vec![
             0x00, 0x09, // struct size
-            0x00, 0x02, // context count
+            0x02, // context count
             0x00, // RFU
-            0x00, 0x00, 0x00, 0x00, 0x18, // Byte count
-            // ---
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Align to 8 bytes
+            0x00, 0x00, 0x00, 0x1c, // Byte count
             // Context 1
             0x00, 0x00, 0x00, 0x04, // data len
             0x00, 0x00, 0x00, 0x00, // error id
@@ -666,16 +688,16 @@ mod test {
         let decoded: ErrorResponse = ErrorResponse::decode(&mut buff, ErrorCode::BufferTooSmall)
             .ok()
             .unwrap();
-        assert_eq!(decoded.byte_count, 24);
+        assert_eq!(decoded.byte_count, 28);
         assert_eq!(decoded.ctx_count, 2);
         assert_eq!(decoded.error_data.len(), 2);
         assert_eq!(decoded.struct_size, 9);
         // Empty context case
         let mut buff: Bytes = Bytes::from(vec![
             0x00, 0x09, // struct size
-            0x00, 0x00, // context count
+            0x00, // context count
             0x00, // RFU
-            0x00, 0x00, 0x00, 0x00, 0x00, // Byte count
+            0x00, 0x00, 0x00, 0x00, // Byte count
         ]);
         let decoded: ErrorResponse = ErrorResponse::decode(&mut buff, ErrorCode::BufferTooSmall)
             .ok()
@@ -687,15 +709,16 @@ mod test {
         // Bad size
         let mut buff: Bytes = Bytes::from(vec![
             0x00, 0x09, // struct size
-            0x00, 0x00, // context count
+            0x02, // context count
             0x00, // RFU
-            0x00, 0x00, 0x00, 0x00, 0x10, // Byte count
+            0x00, 0x00, 0x00, 0x00, // Byte count
         ]);
         assert!(ErrorResponse::decode(&mut buff, ErrorCode::BufferTooSmall).is_err());
         // Bad size
         let mut buff: Bytes = Bytes::from(vec![
             0x00, 0x09, // struct size
-            0x00, 0x00, // context count
+            0x02, // context count
+            0x00, // RFU
         ]);
         assert!(ErrorResponse::decode(&mut buff, ErrorCode::BufferTooSmall).is_err());
     }

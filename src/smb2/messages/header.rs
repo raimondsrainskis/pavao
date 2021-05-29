@@ -112,8 +112,7 @@ impl Decode for AsyncHeader {
         let protocol_id: u32 = buff.get_u32();
         let struct_size: u16 = buff.get_u16();
         let credit_charge: u16 = buff.get_u16();
-        let status: ErrorCode =
-            ErrorCode::try_from(buff.get_u32()).map_err(|_| Error::UnknownErrorCode)?;
+        let status: ErrorCode = ErrorCode::from(buff.get_u32());
         let command_id: CommandId =
             CommandId::try_from(buff.get_u16()).map_err(|_| Error::UnknownCommand)?;
         let credit_request: u16 = buff.get_u16();
@@ -188,9 +187,9 @@ mod test {
             Flags::ASYNC_COMMAND
         );
         assert_eq!(bytes.get_u32(), 0);
-        assert_eq!(bytes.get_u32(), 0xcafebabe);
-        assert_eq!(bytes.get_u32(), 0xdeadbeef);
-        assert_eq!(bytes.get_u32(), 0xcafed00d);
+        assert_eq!(bytes.get_u64(), 0xcafebabe);
+        assert_eq!(bytes.get_u64(), 0xdeadbeef);
+        assert_eq!(bytes.get_u64(), 0xcafed00d);
         let mut signature: Vec<u8> = vec![0x00; 16];
         bytes.copy_to_slice(signature.as_mut_slice());
         assert_eq!(signature, vec![0xff; 16]);
@@ -207,9 +206,9 @@ mod test {
             0x00, 0x00, // credit req
             0x00, 0x00, 0x00, 0x02, // Async
             0x00, 0x00, 0x00, 0x00, // next cmd
-            0xca, 0xfe, 0xba, 0xbe, // msg id
-            0xde, 0xad, 0xbe, 0xef, // async id
-            0xca, 0xfe, 0xd0, 0x0d, // sess id
+            0x00, 0x00, 0x00, 0x00, 0xca, 0xfe, 0xba, 0xbe, // msg id
+            0x00, 0x00, 0x00, 0x00, 0xde, 0xad, 0xbe, 0xef, // async id
+            0x00, 0x00, 0x00, 0x00, 0xca, 0xfe, 0xd0, 0x0d, // sess id
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, // signature
         ]);
@@ -222,8 +221,8 @@ mod test {
         assert_eq!(header.credit_request, 0);
         assert_eq!(header.flags, Flags::ASYNC_COMMAND);
         assert_eq!(header.next_command, 0);
-        assert_eq!(header.async_id, 0xcafebabe);
-        assert_eq!(header.message_id, 0xdeadbeef);
+        assert_eq!(header.message_id, 0xcafebabe);
+        assert_eq!(header.async_id, 0xdeadbeef);
         assert_eq!(header.session_id, 0xcafed00d);
         assert_eq!(header.signature, vec![0xff; 16]);
         // Bad size
@@ -231,23 +230,6 @@ mod test {
             0x42, 0x4D, 0x54, 0xFE, // protocol_id
             0x00, 64, // struct size
             0x00, 0x00, // Credit charge
-            0xff, 0xff, // signature
-        ]);
-        assert!(AsyncHeader::decode(&mut buff).is_err());
-        // Bad status
-        let mut buff: Bytes = Bytes::from(vec![
-            0x42, 0x4D, 0x54, 0xFE, // protocol_id
-            0x00, 64, // struct size
-            0x00, 0x00, // Credit charge
-            0xca, 0xfe, 0xba, 0xbe, // bad bad bad
-            0x00, 0x0d, // echo
-            0x00, 0x00, // credit req
-            0x00, 0x00, 0x00, 0x02, // Async
-            0x00, 0x00, 0x00, 0x00, // next cmd
-            0xca, 0xfe, 0xba, 0xbe, // msg id
-            0xde, 0xad, 0xbe, 0xef, // async id
-            0xca, 0xfe, 0xd0, 0x0d, // sess id
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, // signature
         ]);
         assert!(AsyncHeader::decode(&mut buff).is_err());

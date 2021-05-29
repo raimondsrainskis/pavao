@@ -25,4 +25,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-pub mod buffer;
+
+fn placeholder() {
+    assert_eq!(2 + 2, 4);
+}
