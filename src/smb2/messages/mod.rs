@@ -27,8 +27,10 @@
  * SOFTWARE.
  */
 // modules
-mod error;
-mod header;
+pub mod echo;
+pub mod error;
+pub mod header;
+pub mod logoff;
 // locals
 use super::{Client, SmbResult};
 use super::{Error, ErrorCode};
@@ -89,10 +91,10 @@ impl From<CommandId> for u16 {
 ///
 /// The Command trait describes the methods a command must implement
 pub trait Command: Encode {
-    /// ### get_command_Id
+    /// ### command_id
     ///
     /// Returns the command ID
-    fn get_command_id(&self) -> CommandId;
+    fn command_id(&self) -> CommandId;
 }
 
 /// ## Encode
@@ -126,7 +128,7 @@ impl Encoder {
     /// Encode a message
     pub async fn encode(&self, client: &Client, command: &dyn Command) -> Bytes {
         // Encode header
-        let header: Bytes = AsyncHeader::new(client, command.get_command_id()).encode();
+        let header: Bytes = AsyncHeader::new(client, command.command_id()).encode();
         // Encode command
         let command: Bytes = command.encode();
         // Encode buffer

@@ -28,7 +28,7 @@
 // sub modules
 pub mod builder;
 pub mod errors;
-mod messages;
+pub(crate) mod messages;
 
 // expose
 pub use builder::ClientBuilder;
