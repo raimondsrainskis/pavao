@@ -35,7 +35,53 @@ use super::{Error, ErrorCode};
 use error::ErrorResponse;
 use header::AsyncHeader;
 // deps
-use bytes::{Buf, Bytes};
+use bytes::{Buf, Bytes, BytesMut};
+use std::convert::TryFrom;
+
+// types
+
+/// ## CommandId
+///
+/// Represent the id of each command
+#[derive(Clone, Copy, Debug, Eq, FromPrimitive, PartialEq)]
+pub(crate) enum CommandId {
+    Negotiate = 0x0000,
+    SessionSetup = 0x0001,
+    Logoff = 0x0002,
+    TreeConnect = 0x0003,
+    TreeDisconnect = 0x0004,
+    Create = 0x0005,
+    Close = 0x0006,
+    Flush = 0x0007,
+    Read = 0x0008,
+    Write = 0x009,
+    Lock = 0x000a,
+    Ioctl = 0x000b,
+    Cancel = 0x000c,
+    Echo = 0x000d,
+    QueryDirectory = 0x000e,
+    ChangeNotify = 0x000f,
+    QueryInfo = 0x0010,
+    SetInfo = 0x0011,
+    OpLockBreak = 0x0012,
+}
+
+impl TryFrom<u16> for CommandId {
+    type Error = &'static str;
+
+    fn try_from(cmd: u16) -> Result<Self, Self::Error> {
+        match num::FromPrimitive::from_u16(cmd) {
+            Some(err) => Ok(err),
+            None => Err("Unknown command"),
+        }
+    }
+}
+
+impl From<CommandId> for u16 {
+    fn from(code: CommandId) -> u16 {
+        code as u16
+    }
+}
 
 // traits
 
@@ -46,7 +92,7 @@ pub trait Command: Encode {
     /// ### get_command_Id
     ///
     /// Returns the command ID
-    fn get_command_id(&self) -> u16;
+    fn get_command_id(&self) -> CommandId;
 }
 
 /// ## Encode
@@ -79,9 +125,17 @@ impl Encoder {
     ///
     /// Encode a message
     pub async fn encode(&self, client: &Client, command: &dyn Command) -> Bytes {
-        // Create header
+        // Encode header
         let header: Bytes = AsyncHeader::new(client, command.get_command_id()).encode();
-        Bytes::new() // TODO: replace
+        // Encode command
+        let command: Bytes = command.encode();
+        // Encode buffer
+        let bufsize: usize = header.remaining() + command.remaining();
+        let mut buff: BytesMut = BytesMut::with_capacity(bufsize);
+        buff.extend_from_slice(&header);
+        buff.extend_from_slice(&command);
+        // FIXME: not sure it's that simple
+        buff.freeze()
     }
 }
 
@@ -133,4 +187,68 @@ impl Decoder {
             data: buff.copy_to_bytes(buff.remaining()),
         })
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_smb2_messages_command_id() {
+        assert_eq!(
+            CommandId::try_from(0x0000).ok().unwrap(),
+            CommandId::Negotiate
+        );
+        assert_eq!(
+            CommandId::try_from(0x0001).ok().unwrap(),
+            CommandId::SessionSetup
+        );
+        assert_eq!(CommandId::try_from(0x0002).ok().unwrap(), CommandId::Logoff);
+        assert_eq!(
+            CommandId::try_from(0x0003).ok().unwrap(),
+            CommandId::TreeConnect
+        );
+        assert_eq!(
+            CommandId::try_from(0x0004).ok().unwrap(),
+            CommandId::TreeDisconnect
+        );
+        assert_eq!(CommandId::try_from(0x0005).ok().unwrap(), CommandId::Create);
+        assert_eq!(CommandId::try_from(0x0006).ok().unwrap(), CommandId::Close);
+        assert_eq!(CommandId::try_from(0x0007).ok().unwrap(), CommandId::Flush);
+        assert_eq!(CommandId::try_from(0x0008).ok().unwrap(), CommandId::Read);
+        assert_eq!(CommandId::try_from(0x0009).ok().unwrap(), CommandId::Write);
+        assert_eq!(CommandId::try_from(0x000a).ok().unwrap(), CommandId::Lock);
+        assert_eq!(CommandId::try_from(0x000b).ok().unwrap(), CommandId::Ioctl);
+        assert_eq!(CommandId::try_from(0x000c).ok().unwrap(), CommandId::Cancel);
+        assert_eq!(CommandId::try_from(0x000d).ok().unwrap(), CommandId::Echo);
+        assert_eq!(
+            CommandId::try_from(0x000e).ok().unwrap(),
+            CommandId::QueryDirectory
+        );
+        assert_eq!(
+            CommandId::try_from(0x000f).ok().unwrap(),
+            CommandId::ChangeNotify
+        );
+        assert_eq!(
+            CommandId::try_from(0x0010).ok().unwrap(),
+            CommandId::QueryInfo
+        );
+        assert_eq!(
+            CommandId::try_from(0x0011).ok().unwrap(),
+            CommandId::SetInfo
+        );
+        assert_eq!(
+            CommandId::try_from(0x0012).ok().unwrap(),
+            CommandId::OpLockBreak
+        );
+        // Error
+        assert!(CommandId::try_from(0xcafe).is_err());
+        // To u16
+        let num: u16 = From::from(CommandId::Close);
+        assert_eq!(num, 0x0006);
+    }
+
+    // TODO: encode / decode
 }

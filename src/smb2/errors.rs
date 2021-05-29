@@ -39,6 +39,7 @@ pub enum Error {
     ServerError(ErrorCode),
     InvalidSyntax,
     UnknownErrorCode,
+    UnknownCommand,
 }
 
 /// ## ErrorCode

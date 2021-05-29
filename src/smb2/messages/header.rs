@@ -25,7 +25,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-use super::{Client, Decode, Encode, Error, ErrorCode, SmbResult};
+use super::{Client, CommandId, Decode, Encode, Error, ErrorCode, SmbResult};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::convert::TryFrom;
 
@@ -34,13 +34,13 @@ bitflags! {
     ///
     /// Describes header flags
     struct Flags: u32 {
-        const FLAGS_SERVER_TO_REDIR = 0x00000001;
-        const FLAGS_ASYNC_COMMAND = 0x00000002;
-        const FLAGS_RELATED_OPERATIONS = 0x00000004;
-        const FLAGS_SIGNED = 0x00000008;
-        const FLAGS_PRIORITY_MASK = 0x00000070;
-        const FLAGS_DFS_OPERATIONS = 0x10000000;
-        const FLAGS_REPLAY_OPERATION = 0x20000000;
+        const SERVER_TO_REDIR = 0x00000001;
+        const ASYNC_COMMAND = 0x00000002;
+        const RELATED_OPERATIONS = 0x00000004;
+        const SIGNED = 0x00000008;
+        const PRIORITY_MASK = 0x00000070;
+        const DFS_OPERATIONS = 0x10000000;
+        const REPLAY_OPERATION = 0x20000000;
     }
 }
 
@@ -53,21 +53,21 @@ pub struct AsyncHeader {
     struct_size: u16,
     credit_charge: u16,
     pub status: ErrorCode,
-    command_id: u16,
+    pub command_id: CommandId,
     credit_request: u16,
     flags: Flags,
     next_command: u32,
-    message_id: u64,
-    async_id: u64,
-    session_id: u64,
-    signature: Vec<u8>,
+    pub message_id: u64,
+    pub async_id: u64,
+    pub session_id: u64,
+    pub signature: Vec<u8>, // 16 bytes
 }
 
 impl AsyncHeader {
     /// ### new
     ///
     /// Instantiates a new `AsyncHeader`
-    pub fn new(client: &Client, command_id: u16) -> Self {
+    pub fn new(client: &Client, command_id: CommandId) -> Self {
         Self {
             protocol_id: 0x424D54FE,
             struct_size: 64,
@@ -92,7 +92,7 @@ impl Encode for AsyncHeader {
         header.put_u16(self.struct_size);
         header.put_u16(self.credit_charge);
         header.put_u32(From::from(self.status));
-        header.put_u16(self.command_id);
+        header.put_u16(From::from(self.command_id));
         header.put_u16(self.credit_request);
         header.put_u32(self.flags.bits());
         header.put_u32(self.next_command);
@@ -112,16 +112,12 @@ impl Decode for AsyncHeader {
         let protocol_id: u32 = buff.get_u32();
         let struct_size: u16 = buff.get_u16();
         let credit_charge: u16 = buff.get_u16();
-        let status: ErrorCode = match ErrorCode::try_from(buff.get_u32()) {
-            Ok(e) => e,
-            Err(_) => return Err(Error::UnknownErrorCode),
-        };
-        let command_id: u16 = buff.get_u16();
+        let status: ErrorCode =
+            ErrorCode::try_from(buff.get_u32()).map_err(|_| Error::UnknownErrorCode)?;
+        let command_id: CommandId =
+            CommandId::try_from(buff.get_u16()).map_err(|_| Error::UnknownCommand)?;
         let credit_request: u16 = buff.get_u16();
-        let flags: Flags = match Flags::from_bits(buff.get_u32()) {
-            Some(f) => f,
-            None => Flags::empty(),
-        };
+        let flags: Flags = Flags::from_bits(buff.get_u32()).unwrap_or(Flags::empty());
         let next_command: u32 = buff.get_u32();
         let message_id: u64 = buff.get_u64();
         let async_id: u64 = buff.get_u64();
@@ -142,5 +138,130 @@ impl Decode for AsyncHeader {
             session_id,
             signature,
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    use bytes::Bytes;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_smb2_messages_header_encode() {
+        let header: AsyncHeader = AsyncHeader {
+            protocol_id: 0x424D54FE,
+            struct_size: 64,
+            credit_charge: 0,
+            status: ErrorCode::WrongVolume,
+            command_id: CommandId::Echo,
+            credit_request: 0,
+            flags: Flags::ASYNC_COMMAND,
+            next_command: 0,
+            message_id: 0xcafebabe,
+            async_id: 0xdeadbeef,
+            session_id: 0xcafed00d,
+            signature: vec![0xff; 16],
+        };
+        let mut bytes: Bytes = header.encode();
+        assert_eq!(bytes.get_u32(), 0x424D54FE);
+        assert_eq!(bytes.get_u16(), 64);
+        assert_eq!(bytes.get_u16(), 0);
+        assert_eq!(
+            ErrorCode::try_from(bytes.get_u32()).ok().unwrap(),
+            ErrorCode::WrongVolume
+        );
+        assert_eq!(
+            CommandId::try_from(bytes.get_u16()).ok().unwrap(),
+            CommandId::Echo
+        );
+        assert_eq!(bytes.get_u16(), 0);
+        assert_eq!(
+            Flags::from_bits(bytes.get_u32()).unwrap(),
+            Flags::ASYNC_COMMAND
+        );
+        assert_eq!(bytes.get_u32(), 0);
+        assert_eq!(bytes.get_u32(), 0xcafebabe);
+        assert_eq!(bytes.get_u32(), 0xdeadbeef);
+        assert_eq!(bytes.get_u32(), 0xcafed00d);
+        let mut signature: Vec<u8> = vec![0x00; 16];
+        bytes.copy_to_slice(signature.as_mut_slice());
+        assert_eq!(signature, vec![0xff; 16]);
+    }
+
+    #[test]
+    fn test_smb2_messages_header_decode() {
+        let buff: Bytes = Bytes::from(vec![
+            0x42, 0x4D, 0x54, 0xFE, // protocol_id
+            0x00, 64, // struct size
+            0x00, 0x00, // Credit charge
+            0x80, 0x00, 0x00, 0x2d, // stopped on symlink
+            0x00, 0x0d, // echo
+            0x00, 0x00, // credit req
+            0x00, 0x00, 0x00, 0x02, // Async
+            0x00, 0x00, 0x00, 0x00, // next cmd
+            0xca, 0xfe, 0xba, 0xbe, // msg id
+            0xde, 0xad, 0xbe, 0xef, // async id
+            0xca, 0xfe, 0xd0, 0x0d, // sess id
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, // signature
+        ]);
+        let header: AsyncHeader = AsyncHeader::decode(&mut buff).ok().unwrap();
+        assert_eq!(header.protocol_id, 0x424d54fe);
+        assert_eq!(header.struct_size, 64);
+        assert_eq!(header.credit_charge, 0);
+        assert_eq!(header.status, ErrorCode::StoppedOnSymlink);
+        assert_eq!(header.command_id, CommandId::Echo);
+        assert_eq!(header.credit_request, 0);
+        assert_eq!(header.flags, Flags::ASYNC_COMMAND);
+        assert_eq!(header.next_command, 0);
+        assert_eq!(header.async_id, 0xcafebabe);
+        assert_eq!(header.message_id, 0xdeadbeef);
+        assert_eq!(header.session_id, 0xcafed00d);
+        assert_eq!(header.signature, vec![0xff; 16]);
+        // Bad size
+        let buff: Bytes = Bytes::from(vec![
+            0x42, 0x4D, 0x54, 0xFE, // protocol_id
+            0x00, 64, // struct size
+            0x00, 0x00, // Credit charge
+            0xff, 0xff, // signature
+        ]);
+        assert!(AsyncHeader::decode(&mut buff).is_err());
+        // Bad status
+        let buff: Bytes = Bytes::from(vec![
+            0x42, 0x4D, 0x54, 0xFE, // protocol_id
+            0x00, 64, // struct size
+            0x00, 0x00, // Credit charge
+            0xca, 0xfe, 0xba, 0xbe, // bad bad bad
+            0x00, 0x0d, // echo
+            0x00, 0x00, // credit req
+            0x00, 0x00, 0x00, 0x02, // Async
+            0x00, 0x00, 0x00, 0x00, // next cmd
+            0xca, 0xfe, 0xba, 0xbe, // msg id
+            0xde, 0xad, 0xbe, 0xef, // async id
+            0xca, 0xfe, 0xd0, 0x0d, // sess id
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, // signature
+        ]);
+        assert!(AsyncHeader::decode(&mut buff).is_err());
+        // Bad command
+        let buff: Bytes = Bytes::from(vec![
+            0x42, 0x4D, 0x54, 0xFE, // protocol_id
+            0x00, 64, // struct size
+            0x00, 0x00, // Credit charge
+            0x80, 0x00, 0x00, 0x2d, // stopped on symlink
+            0xca, 0xfe, // bad bad bad
+            0x00, 0x00, // credit req
+            0x00, 0x00, 0x00, 0x02, // Async
+            0x00, 0x00, 0x00, 0x00, // next cmd
+            0xca, 0xfe, 0xba, 0xbe, // msg id
+            0xde, 0xad, 0xbe, 0xef, // async id
+            0xca, 0xfe, 0xd0, 0x0d, // sess id
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, // signature
+        ]);
+        assert!(AsyncHeader::decode(&mut buff).is_err());
     }
 }
