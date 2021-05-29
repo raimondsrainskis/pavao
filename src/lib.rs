@@ -52,8 +52,8 @@ extern crate log;
 extern crate num;
 #[macro_use]
 extern crate num_derive;
-#[macro_use]
-extern crate thiserror;
-// modules
+// public
 pub mod smb2;
+// private global
+pub(crate) mod socket;
 mod utils;

@@ -29,14 +29,13 @@
 pub mod builder;
 pub mod errors;
 mod messages;
-mod socket;
 
 // expose
 pub use builder::ClientBuilder;
 pub use errors::{Error, ErrorCode};
 
 // internal
-use socket::Socket;
+use crate::socket::Socket;
 
 // types
 pub type SmbResult<T> = Result<T, Error>;

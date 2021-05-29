@@ -44,7 +44,7 @@ use std::convert::TryFrom;
 ///
 /// Represent the id of each command
 #[derive(Clone, Copy, Debug, Eq, FromPrimitive, PartialEq)]
-pub(crate) enum CommandId {
+pub enum CommandId {
     Negotiate = 0x0000,
     SessionSetup = 0x0001,
     Logoff = 0x0002,
@@ -157,8 +157,16 @@ pub trait Decode: Sized {
 #[derive(Debug)]
 pub struct Response {
     header: AsyncHeader,
-    error: Option<ErrorResponse>, // CHECK: data might become a variant between ErrorResponse and Bytes
-    data: Bytes,                  // NOTE: Remaining bytes; must be decoded by calling method
+    data: ResponseData,
+}
+
+/// ## ResponseData
+///
+/// Data associated to response
+#[derive(Debug)]
+pub enum ResponseData {
+    Ok(Bytes), // NOTE: Remaining bytes; must be decoded by calling method
+    Err(ErrorResponse),
 }
 
 /// ## Decoder
@@ -179,13 +187,12 @@ impl Decoder {
     /// Decode incoming buffer
     pub async fn decode(&self, buff: &mut dyn Buf) -> SmbResult<Response> {
         let header: AsyncHeader = AsyncHeader::decode(buff)?;
-        // TODO: check error???
-        let error: Option<ErrorResponse> = None;
-        Ok(Response {
-            header,
-            error,
-            data: buff.copy_to_bytes(buff.remaining()),
-        })
+        // Decode data
+        let data: ResponseData = match header.status {
+            ErrorCode::Success => ResponseData::Ok(buff.copy_to_bytes(buff.remaining())),
+            status => ResponseData::Err(ErrorResponse::decode(buff, status)?),
+        };
+        Ok(Response { header, data })
     }
 }
 

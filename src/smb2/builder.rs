@@ -25,11 +25,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-use super::Client;
+use super::{Client, ProtocolVersion, SmbResult};
 
 /// ## ClientBuilder
 ///
 /// A helper struct to use to setup the SMB2 client
 pub struct ClientBuilder {
-    client: Option<Client>,
+    versions: Vec<ProtocolVersion>, // Selected versions
 }
+
+// TODO: methods (setters + connect)
+
+// TODO: default

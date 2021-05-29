@@ -36,4 +36,19 @@ pub struct Socket {
     stream: TcpStream,
 }
 
-impl Socket {}
+impl Socket {
+    // TODO: impl
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    use pretty_assertions::assert_eq;
+
+    #[cfg(test)]
+    fn test_socket() {
+        // TODO: impl
+    }
+}

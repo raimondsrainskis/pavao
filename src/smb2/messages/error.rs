@@ -612,7 +612,7 @@ mod test {
             panic!("Expected BufferTooSmall");
         }
         let mut buff: Bytes = Bytes::from(vec![0x00, 0x00, 0x00, 0x00]);
-        assert!(ErrorContextData::decode(&mut buff, ErrorCode::AbiosNotPresent).is_err());
+        assert!(ErrorContextData::decode(&mut buff, ErrorCode::AccountExpired).is_err());
     }
 
     #[test]

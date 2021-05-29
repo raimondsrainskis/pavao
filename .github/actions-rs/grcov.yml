@@ -6,3 +6,4 @@ ignore:
     - "/*"
     - "C:/*"
     - "../*"
+    - "src/smb2/errors.rs"

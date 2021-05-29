@@ -150,6 +150,11 @@ mod test {
     use pretty_assertions::assert_eq;
 
     #[test]
+    fn test_smb2_messages_header_new() {
+        // TODO: implement
+    }
+
+    #[test]
     fn test_smb2_messages_header_encode() {
         let header: AsyncHeader = AsyncHeader {
             protocol_id: 0x424D54FE,
@@ -193,7 +198,7 @@ mod test {
 
     #[test]
     fn test_smb2_messages_header_decode() {
-        let buff: Bytes = Bytes::from(vec![
+        let mut buff: Bytes = Bytes::from(vec![
             0x42, 0x4D, 0x54, 0xFE, // protocol_id
             0x00, 64, // struct size
             0x00, 0x00, // Credit charge
@@ -222,7 +227,7 @@ mod test {
         assert_eq!(header.session_id, 0xcafed00d);
         assert_eq!(header.signature, vec![0xff; 16]);
         // Bad size
-        let buff: Bytes = Bytes::from(vec![
+        let mut buff: Bytes = Bytes::from(vec![
             0x42, 0x4D, 0x54, 0xFE, // protocol_id
             0x00, 64, // struct size
             0x00, 0x00, // Credit charge
@@ -230,7 +235,7 @@ mod test {
         ]);
         assert!(AsyncHeader::decode(&mut buff).is_err());
         // Bad status
-        let buff: Bytes = Bytes::from(vec![
+        let mut buff: Bytes = Bytes::from(vec![
             0x42, 0x4D, 0x54, 0xFE, // protocol_id
             0x00, 64, // struct size
             0x00, 0x00, // Credit charge
@@ -247,7 +252,7 @@ mod test {
         ]);
         assert!(AsyncHeader::decode(&mut buff).is_err());
         // Bad command
-        let buff: Bytes = Bytes::from(vec![
+        let mut buff: Bytes = Bytes::from(vec![
             0x42, 0x4D, 0x54, 0xFE, // protocol_id
             0x00, 64, // struct size
             0x00, 0x00, // Credit charge
