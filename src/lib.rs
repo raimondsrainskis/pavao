@@ -43,7 +43,7 @@
  * SOFTWARE.
  */
 // deps
-extern crate async_net;
+extern crate async_std;
 #[macro_use]
 extern crate bitflags;
 extern crate bytes;

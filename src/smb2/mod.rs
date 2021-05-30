@@ -59,7 +59,8 @@ pub struct Client {
 /// ## ProtocolVersion
 ///
 /// Describes the negotiated protocol version
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u16)]
 pub(crate) enum ProtocolVersion {
     V202 = 0x0202,
     V210 = 0x0210,

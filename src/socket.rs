@@ -26,7 +26,9 @@
  * SOFTWARE.
  */
 // deps
-use async_net::TcpStream;
+use async_std::net::{Shutdown, TcpStream};
+use async_std::prelude::*;
+use std::io::Result as IoResult;
 
 /// ## Socket
 ///
@@ -37,7 +39,34 @@ pub struct Socket {
 }
 
 impl Socket {
-    // TODO: impl
+    /// ### connect
+    ///
+    /// Try to connect to remote
+    pub async fn connect(addr: &str) -> IoResult<Self> {
+        let stream: TcpStream = TcpStream::connect(addr).await?;
+        Ok(Socket { stream })
+    }
+
+    /// ### disconnect
+    ///
+    /// Disconnect from remote
+    pub async fn disconnect(&self) -> IoResult<()> {
+        self.stream.shutdown(Shutdown::Both)
+    }
+
+    /// ### send
+    ///
+    /// Send data to socket
+    pub async fn send(&mut self, data: &[u8]) -> IoResult<()> {
+        self.stream.write_all(data).await
+    }
+
+    /// ### recv
+    ///
+    /// Receive from socket
+    pub async fn recv(&mut self, buffer: &mut [u8]) -> IoResult<usize> {
+        self.stream.read(buffer).await
+    }
 }
 
 #[cfg(test)]
@@ -45,10 +74,49 @@ mod test {
 
     use super::*;
 
+    use async_std::net::TcpListener;
     use pretty_assertions::assert_eq;
 
-    #[cfg(test)]
-    fn test_socket() {
-        // TODO: impl
+    #[async_attributes::test]
+    async fn test_socket() {
+        // Setup a dummy tcp listener
+        let host: &str = "127.0.0.1:8470";
+        let listener = TcpListener::bind(host).await.ok().unwrap();
+        let mut incoming = listener.incoming();
+        // Connect client
+        let mut socket: Socket = Socket::connect(host).await.ok().unwrap();
+        // Write something
+        let expected: &[u8] = &[0xca, 0xfe, 0xba, 0xbe, 0x15, 0xde, 0xad, 0x00];
+        assert!(socket.send(expected).await.is_ok());
+        while let Some(stream) = incoming.next().await {
+            match stream {
+                Ok(mut stream) => {
+                    // Write data back
+                    let mut read = vec![0; 1024];
+                    match stream.read(&mut read).await {
+                        Ok(n) => {
+                            if n == 0 {
+                                // connection was closed
+                                break;
+                            }
+                            assert_eq!(stream.write(&read[0..n]).await.ok().unwrap(), 8);
+                            // Read
+                            let mut incoming = vec![0; 1024];
+                            assert_eq!(socket.recv(incoming.as_mut_slice()).await.ok().unwrap(), 8);
+                            assert_eq!(incoming[0..8], *expected);
+                            // Close
+                            assert!(socket.disconnect().await.is_ok());
+                            break;
+                        }
+                        Err(err) => {
+                            panic!("socket error: {}", err);
+                        }
+                    }
+                }
+                Err(err) => {
+                    panic!("Socket error: {}", err);
+                }
+            }
+        }
     }
 }
