@@ -31,6 +31,7 @@ pub mod echo;
 pub mod error;
 pub mod header;
 pub mod logoff;
+pub mod negotiate;
 // locals
 use super::{Client, SmbResult};
 use super::{Error, ErrorCode};

@@ -33,6 +33,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 /// ## EchoRequest
 ///
 /// Represents a EchoRequest
+#[derive(Debug)]
 pub struct EchoRequest {
     struct_size: u16,
     rfu: u16,
@@ -65,6 +66,7 @@ impl Command for EchoRequest {
 /// ## EchoRequest
 ///
 /// Represents a EchoResponse
+#[derive(Debug)]
 pub struct EchoResponse;
 
 impl Decode for EchoResponse {

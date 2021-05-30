@@ -47,6 +47,13 @@ impl Guid {
         let guid: Vec<u8> = (0..16).map(|_| uniform.sample(&mut rng)).collect();
         Self { guid }
     }
+
+    /// ### data
+    ///
+    /// Get guid data
+    pub fn data(&self) -> &[u8] {
+        self.guid.as_slice()
+    }
 }
 
 impl TryFrom<Vec<u8>> for Guid {
@@ -75,7 +82,14 @@ mod test {
             0xca, 0xfe, 0xba, 0xbe, 0x15, 0xde, 0xad, 0xa1, 0x1a, 0x10, 0x03, 0xba, 0x71, 0x0f,
             0xed, 0x00,
         ];
-        assert_eq!(Guid::try_from(guid).ok().unwrap().guid.len(), 16);
+        let guid: Guid = Guid::try_from(guid).ok().unwrap();
+        assert_eq!(
+            guid.data(),
+            &[
+                0xca, 0xfe, 0xba, 0xbe, 0x15, 0xde, 0xad, 0xa1, 0x1a, 0x10, 0x03, 0xba, 0x71, 0x0f,
+                0xed, 0x00
+            ]
+        );
         assert!(Guid::try_from(vec![0; 5]).is_err());
     }
 }
