@@ -1,6 +1,6 @@
-//! # smb2
+//! # types
 //!
-//! exposes the client for SMB2/3
+//! exposes some custom data types for SMB2/£
 
 /**
  * MIT License
@@ -25,45 +25,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-// sub modules
-pub mod builder;
-pub mod errors;
-pub(crate) mod messages;
-pub(crate) mod types;
-
-// expose
-pub use builder::ClientBuilder;
-pub use errors::{Error, ErrorCode};
-
-// internal
-use crate::socket::Socket;
-use types::Guid;
-
-// types
-pub type SmbResult<T> = Result<T, Error>;
-
-/// ## Client
-///
-/// SMB2/3 client. This is the only struct the client must use in order to connect with the remote server
-#[derive(Debug)]
-pub struct Client {
-    pub(crate) socket: Socket,
-    pub(crate) timeout: Option<usize>,
-    pub(crate) smb_version: ProtocolVersion,
-    pub(crate) guid: Guid,
-    pub(crate) async_id: u64,
-    pub(crate) message_id: u64,
-    pub(crate) session_id: u64,
-}
-
-/// ## ProtocolVersion
-///
-/// Describes the negotiated protocol version
-#[derive(Debug)]
-pub(crate) enum ProtocolVersion {
-    V202 = 0x0202,
-    V210 = 0x0210,
-    V300 = 0x0300,
-    V302 = 0x0302,
-    V311 = 0x0311,
-}
+// mods
+pub mod guid;
+// exposes
+pub use guid::Guid;

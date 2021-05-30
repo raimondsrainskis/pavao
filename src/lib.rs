@@ -52,6 +52,7 @@ extern crate log;
 extern crate num;
 #[macro_use]
 extern crate num_derive;
+extern crate rand;
 // public
 pub mod smb2;
 // private global
