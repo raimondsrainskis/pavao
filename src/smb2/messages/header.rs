@@ -116,7 +116,7 @@ impl Decode for AsyncHeader {
         let command_id: CommandId =
             CommandId::try_from(buff.get_u16()).map_err(|_| Error::UnknownCommand)?;
         let credit_request: u16 = buff.get_u16();
-        let flags: Flags = Flags::from_bits(buff.get_u32()).unwrap_or(Flags::empty());
+        let flags: Flags = Flags::from_bits(buff.get_u32()).unwrap_or_else(Flags::empty);
         let next_command: u32 = buff.get_u32();
         let message_id: u64 = buff.get_u64();
         let async_id: u64 = buff.get_u64();

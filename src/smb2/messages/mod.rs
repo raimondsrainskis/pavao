@@ -46,6 +46,7 @@ use std::convert::TryFrom;
 ///
 /// Represent the id of each command
 #[derive(Clone, Copy, Debug, Eq, FromPrimitive, PartialEq)]
+#[repr(u16)]
 pub enum CommandId {
     Negotiate = 0x0000,
     SessionSetup = 0x0001,

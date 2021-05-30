@@ -49,6 +49,7 @@ pub enum Error {
 /// Describes an error returned in state. For SMB2 the values are listed here:
 /// <https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55>
 #[derive(Clone, Copy, Debug, Error, FromPrimitive, PartialEq, Eq)]
+#[repr(u32)]
 pub enum ErrorCode {
     #[error("The operation completed successfully")]
     Success = 0x00000000,

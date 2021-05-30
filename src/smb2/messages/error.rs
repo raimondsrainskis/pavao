@@ -102,7 +102,7 @@ impl ErrorContext {
         if buff.remaining() < data_length as usize {
             return Err(Error::InvalidSyntax);
         }
-        let mut data: ErrorContextData = ErrorContextData::decode(buff, error_code)?;
+        let data: ErrorContextData = ErrorContextData::decode(buff, error_code)?;
         Ok(ErrorContext {
             data_length,
             error_id,
@@ -115,6 +115,7 @@ impl ErrorContext {
 ///
 /// An identifier for the error context.
 #[derive(Clone, Copy, Debug, FromPrimitive, PartialEq, Eq)]
+#[repr(u32)]
 pub enum ErrorId {
     Default = 0x00000000,
     ShareRedirect = 0x72645253,
@@ -267,8 +268,8 @@ impl Decode for SymbolicLinkError {
             print_name_offset,
             print_name_length,
             flags,
-            print_name,
             substitute_name,
+            print_name,
         })
     }
 }
