@@ -48,7 +48,7 @@ bitflags! {
 ///
 /// Message header for async messages
 #[derive(Debug)]
-pub struct AsyncHeader {
+pub(crate) struct AsyncHeader {
     protocol_id: u32,
     struct_size: u16,
     credit_charge: u16,

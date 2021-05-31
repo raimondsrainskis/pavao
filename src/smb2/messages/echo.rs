@@ -34,7 +34,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 ///
 /// Represents a EchoRequest
 #[derive(Debug)]
-pub struct EchoRequest {
+pub(crate) struct EchoRequest {
     struct_size: u16,
     rfu: u16,
 }
@@ -67,7 +67,7 @@ impl Command for EchoRequest {
 ///
 /// Represents a EchoResponse
 #[derive(Debug)]
-pub struct EchoResponse;
+pub(crate) struct EchoResponse;
 
 impl Decode for EchoResponse {
     fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {

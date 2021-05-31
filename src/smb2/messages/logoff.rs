@@ -34,7 +34,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 ///
 /// Represents a LogoffRequest
 #[derive(Debug)]
-pub struct LogoffRequest {
+pub(crate) struct LogoffRequest {
     struct_size: u16,
     rfu: u16,
 }
@@ -67,7 +67,7 @@ impl Command for LogoffRequest {
 ///
 /// Represents a LogoffResponse
 #[derive(Debug)]
-pub struct LogoffResponse;
+pub(crate) struct LogoffResponse;
 
 impl Decode for LogoffResponse {
     fn decode(buff: &mut dyn Buf) -> SmbResult<Self> {

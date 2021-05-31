@@ -36,7 +36,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 ///
 /// Error response in the SMB2 protocol
 #[derive(Debug)]
-pub struct ErrorResponse {
+pub(crate) struct ErrorResponse {
     struct_size: u16,
     ctx_count: u8,
     // rfu 8
@@ -83,7 +83,7 @@ impl ErrorResponse {
 ///
 /// Error context as expected by the `ErrorResponse`
 #[derive(Debug)]
-pub struct ErrorContext {
+pub(crate) struct ErrorContext {
     data_length: u32,
     pub error_id: ErrorId,
     pub data: ErrorContextData,
@@ -116,7 +116,7 @@ impl ErrorContext {
 /// An identifier for the error context.
 #[derive(Clone, Copy, Debug, FromPrimitive, PartialEq, Eq)]
 #[repr(u32)]
-pub enum ErrorId {
+pub(crate) enum ErrorId {
     Default = 0x00000000,
     ShareRedirect = 0x72645253,
 }
@@ -136,7 +136,7 @@ impl TryFrom<u32> for ErrorId {
 ///
 /// Error data formatted as specified in smb2
 #[derive(Debug)]
-pub enum ErrorContextData {
+pub(crate) enum ErrorContextData {
     SymbolicLink(SymbolicLinkError),
     ShareRedirect(ShareRedirectError),
     BufferTooSmall(u32),
@@ -165,7 +165,7 @@ impl ErrorContextData {
 /// The Symbolic Link Error Response is used to indicate that a symbolic link was encountered on create;
 /// it describes the target path that the client MUST use if it requires to follow the symbolic link.
 #[derive(Debug)]
-pub struct SymbolicLinkError {
+pub(crate) struct SymbolicLinkError {
     symlink_length: u32,
     symlink_error_tag: u32,
     reparse_tag: u32,
@@ -184,7 +184,7 @@ bitflags! {
     /// ## SymbolicLinkErrorFlags
     ///
     /// Describes symbolic link error flags
-    pub struct SymbolicLinkErrorFlags: u32 {
+    pub(crate) struct SymbolicLinkErrorFlags: u32 {
         const ABSOLUTE = 0x00000000;
         const RELATIVE = 0x00000001;
     }
@@ -280,7 +280,7 @@ impl Decode for SymbolicLinkError {
 /// tree connect request with the SMB2_TREE_CONNECT_FLAG_REDIRECT_TO_OWNER bit set in the
 /// Flags field of the SMB2 TREE_CONNECT request.
 #[derive(Debug)]
-pub struct ShareRedirectError {
+pub(crate) struct ShareRedirectError {
     struct_size: u32,
     notification_type: u32,
     resource_name_offset: u32,
@@ -341,7 +341,7 @@ impl Decode for ShareRedirectError {
 /// The MOVE_DST_IPADDR structure is used in Share Redirect Error Context Response to indicate the
 /// destination IP address.
 #[derive(Debug)]
-pub struct MoveDstIpAddr {
+pub(crate) struct MoveDstIpAddr {
     pub type_: MoveDstIpAddrType,
     // rfu
     pub addr: IpAddr,
@@ -351,7 +351,7 @@ bitflags! {
     /// ## MoveDstIpAddrType
     ///
     /// Type of ip address type
-    pub struct MoveDstIpAddrType: u32 {
+    pub(crate) struct MoveDstIpAddrType: u32 {
         const V4 = 0x00000001;
         const V6 = 0x00000002;
     }

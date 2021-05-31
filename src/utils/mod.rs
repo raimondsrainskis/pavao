@@ -26,6 +26,39 @@
  * SOFTWARE.
  */
 
-fn placeholder() {
-    println!("Remove this");
+/// ### pad_to_32_bit
+///
+/// Calculate length as if data were padded to 32 bit on the left
+pub fn pad_to_32_bit(len: usize) -> usize {
+    (len + 0x03) & 0xfffffffc
+}
+
+/// ### pad_to_64_bit
+///
+/// Calculate length as if data were padded to 64 bit on the left
+pub fn pad_to_64_bit(len: usize) -> usize {
+    (len + 0x07) & 0xfffffff8
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_utils_pad_to_32_bit() {
+        assert_eq!(pad_to_32_bit(36), 36);
+        assert_eq!(pad_to_32_bit(38), 40);
+        assert_eq!(pad_to_32_bit(40), 40);
+        assert_eq!(pad_to_32_bit(42), 44);
+    }
+
+    #[test]
+    fn test_utils_pad_to_64_bit() {
+        assert_eq!(pad_to_64_bit(32), 32);
+        assert_eq!(pad_to_64_bit(38), 40);
+        assert_eq!(pad_to_64_bit(40), 40);
+        assert_eq!(pad_to_64_bit(42), 48);
+    }
 }

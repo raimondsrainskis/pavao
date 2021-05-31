@@ -27,8 +27,9 @@
  */
 // locals
 use super::{Command, CommandId, Decode, Encode, Error, SmbResult};
-use crate::smb2::types::{Cipher, Guid, HashAlgorithm, HashOptions, Salt, SigningAlgorithm};
+use crate::smb2::types::{Cipher, Guid, HashAlgorithm, HashOptions, SigningAlgorithm};
 use crate::smb2::ProtocolVersion;
+use crate::utils::pad_to_32_bit;
 // deps
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
@@ -36,13 +37,13 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 ///
 /// Represents a Negotiate
 #[derive(Debug)]
-pub struct NegotiateRequest {
+pub(crate) struct NegotiateRequest {
     struct_size: u16,
     security_mode: SecurityMode,
     capabilities: Smbv3Capabilities,
-    client_guid: Guid,   // 16 bytes
-    context_offset: u32, // 0x311 only
-    start_time: u64,     // always 0; not for 0x311
+    client_guid: Guid, // 16 bytes
+    // context_offset: u32, // 0x311 only
+    start_time: u64, // always 0; not for 0x311
     dialects: Vec<ProtocolVersion>,
     ctx_list: Vec<NegotiateContext>, // List of negotiate context (length match context_count; 0x311 only)
 }
@@ -62,26 +63,65 @@ bitflags! {
     ///
     /// Describes the smb3 capabilities in negotiation
     pub struct Smbv3Capabilities: u32 {
-        //const DFS = 0x00000001; // Distributed file system
+        // const DFS = 0x00000001; // Distributed file system
         // const LEASING = 0x00000002;
         // const LARGE_MTU = 0x00000004; NOT SUPPORTED
-        const MULTI_CHANNEL = 0x00000008; // CHECK: supported?
-        const PERSISTENT_HANDLES = 0x00000010; // CHECK: supported?
+        // const MULTI_CHANNEL = 0x00000008; // NOT SUPPORTED
+        // const PERSISTENT_HANDLES = 0x00000010; // NOT SUPPORTED
         // const DIRECTORY_LEASING = 0x00000020; NOT SUPPORTED
         const ENCRYPTION = 0x00000040;
     }
 }
 
-/*
 impl NegotiateRequest {
     /// ### new
     ///
     /// Create a new NegotiateRequest
-    pub fn new(dialects: Vec<ProtocolVersion>, guid: Guid, hash: HashOptions, ciphers: Vec<Ciphers>, signatures: Vec<SigningAlgorithm>) -> Self {
-        // TODO:
+    pub fn new(
+        dialects: Vec<ProtocolVersion>,
+        guid: Guid,
+        hash: HashOptions,
+        ciphers: Vec<Cipher>,
+        signatures: Vec<SigningAlgorithm>,
+    ) -> Self {
+        let security_mode: SecurityMode = match signatures.len() {
+            0 => SecurityMode::Enabled,
+            _ => SecurityMode::Required,
+        };
+        // Prepare capabilities
+        let capabilities: Smbv3Capabilities = Smbv3Capabilities::ENCRYPTION;
+        // Prepare contexts list
+        let ctx_list: Vec<NegotiateContext> = match dialects.contains(&ProtocolVersion::V311) {
+            false => vec![],
+            true => {
+                vec![
+                    NegotiateContext::PreauthIntegrityCapabilities(
+                        PreauthIntegrityCapabilitiesData {
+                            hash_algorithms: hash.algorithms().to_vec(),
+                            salt: hash.salt().to_vec(),
+                        },
+                    ),
+                    NegotiateContext::EncryptionCapabilities(EncryptionCapabilitiesData {
+                        ciphers,
+                    }),
+                    NegotiateContext::SigningCapabilities(SigningCapabilitiesData {
+                        algorithms: signatures,
+                    }),
+                    NegotiateContext::CompressionCapabilities(CompressionCapabilitiesData {}),
+                ]
+            }
+        };
+        Self {
+            struct_size: 36,
+            security_mode,
+            capabilities,
+            client_guid: guid,
+            start_time: 0x00,
+            dialects,
+            ctx_list,
+        }
     }
 }
-*/
 
 impl Encode for NegotiateRequest {
     fn encode(&self) -> Bytes {
@@ -90,6 +130,17 @@ impl Encode for NegotiateRequest {
         // Calc contexts size
         let contexts_size: usize = contexts_buffers.iter().map(|x| x.len()).sum();
         // Buff len is: 36 (base) + 2 bytes for each dialect; length for context is variable
+        let buf_size: usize = 36 + (self.dialects.len() * 2);
+        let (mut buf_size, padding): (usize, usize) = {
+            let val: usize = pad_to_32_bit(buf_size);
+            (val, val - buf_size)
+        };
+        // Align to 64 bit boundaries
+        if contexts_size > 0 {
+            if buf_size & 0x04 != 0 {
+                buf_size += 4;
+            }
+        }
         let mut buff: BytesMut =
             BytesMut::with_capacity(36 + (self.dialects.len() * 2) + contexts_size);
         buff.put_u16(self.struct_size);
@@ -101,13 +152,18 @@ impl Encode for NegotiateRequest {
         match self.dialects.contains(&ProtocolVersion::V311) {
             false => buff.put_u64(self.start_time),
             true => {
-                buff.put_u32(self.context_offset);
+                let context_offset: u32 = (buf_size + 64) as u32;
+                buff.put_u32(context_offset); // Offset from header start
                 buff.put_u16(contexts_buffers.len() as u16);
                 buff.put_u16(0x0000); // RFU
             }
         }
         // Put dialects
         self.dialects.iter().for_each(|x| buff.put_u16(*x as u16));
+        // Add padding
+        if contexts_buffers.len() > 0 {
+            (0..padding).for_each(|_| buff.put_u8(0x00));
+        }
         // put contexts
         contexts_buffers
             .iter()
@@ -185,22 +241,22 @@ impl NegotiateContext {
 #[derive(Debug)]
 struct PreauthIntegrityCapabilitiesData {
     hash_algorithms: Vec<HashAlgorithm>,
-    salt: Salt,
+    salt: Vec<u8>,
 }
 
 impl Encode for PreauthIntegrityCapabilitiesData {
     fn encode(&self) -> Bytes {
         let buff_size: usize =
-            (self.hash_algorithms.len() as usize * 2) + (self.salt.data().len() as usize) + 4;
+            (self.hash_algorithms.len() as usize * 2) + (self.salt.len() as usize) + 4;
         let mut buff: BytesMut = BytesMut::with_capacity(buff_size);
         buff.put_u16(self.hash_algorithms.len() as u16);
-        buff.put_u16(self.salt.data().len() as u16);
+        buff.put_u16(self.salt.len() as u16);
         // Put algos
         self.hash_algorithms
             .iter()
             .for_each(|x| buff.put_u16(*x as u16));
         // Put salt
-        buff.put(self.salt.data());
+        buff.put(self.salt.as_slice());
         buff.freeze()
     }
 }
@@ -275,6 +331,7 @@ impl Encode for SigningCapabilitiesData {
 mod test {
 
     use super::*;
+    use crate::smb2::types::Salt;
 
     use pretty_assertions::assert_eq;
 
@@ -291,7 +348,7 @@ mod test {
         let data: NegotiateContext =
             NegotiateContext::PreauthIntegrityCapabilities(PreauthIntegrityCapabilitiesData {
                 hash_algorithms: vec![HashAlgorithm::Sha512],
-                salt,
+                salt: salt.data().to_vec(),
             });
         assert_eq!(data.encode().to_vec(), expected.as_slice());
     }

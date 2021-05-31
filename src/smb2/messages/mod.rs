@@ -27,11 +27,11 @@
  * SOFTWARE.
  */
 // modules
-pub mod echo;
-pub mod error;
-pub mod header;
-pub mod logoff;
-pub mod negotiate;
+pub(crate) mod echo;
+pub(crate) mod error;
+pub(crate) mod header;
+pub(crate) mod logoff;
+pub(crate) mod negotiate;
 // locals
 use super::{Client, SmbResult};
 use super::{Error, ErrorCode};
@@ -48,7 +48,7 @@ use std::convert::TryFrom;
 /// Represent the id of each command
 #[derive(Clone, Copy, Debug, Eq, FromPrimitive, PartialEq)]
 #[repr(u16)]
-pub enum CommandId {
+pub(crate) enum CommandId {
     Negotiate = 0x0000,
     SessionSetup = 0x0001,
     Logoff = 0x0002,
@@ -92,7 +92,7 @@ impl From<CommandId> for u16 {
 /// ## Command
 ///
 /// The Command trait describes the methods a command must implement
-pub trait Command: Encode {
+pub(crate) trait Command: Encode {
     /// ### command_id
     ///
     /// Returns the command ID
@@ -103,7 +103,7 @@ pub trait Command: Encode {
 ///
 /// The encode traits must be implemented by all the commands and requires to implement a method which encodes the command into
 /// a buffer
-pub trait Encode {
+pub(crate) trait Encode {
     /// ### encode
     ///
     /// Encode the command
@@ -116,7 +116,7 @@ pub trait Encode {
 ///
 /// The encoder, as the name suggests, encode a message
 #[derive(Debug)]
-pub struct Encoder;
+pub(crate) struct Encoder;
 
 impl Default for Encoder {
     fn default() -> Self {
@@ -148,7 +148,7 @@ impl Encoder {
 /// ## Decode
 ///
 /// The Decode trait must be implemented by all the data types which must be decoded, since received as response from the server
-pub trait Decode: Sized {
+pub(crate) trait Decode: Sized {
     /// ### decode
     ///
     /// Try to decode buff into `Self`
@@ -159,7 +159,7 @@ pub trait Decode: Sized {
 ///
 /// Represents a SMB2 response
 #[derive(Debug)]
-pub struct Response {
+pub(crate) struct Response {
     header: AsyncHeader,
     data: ResponseData,
 }
@@ -168,7 +168,7 @@ pub struct Response {
 ///
 /// Data associated to response
 #[derive(Debug)]
-pub enum ResponseData {
+pub(crate) enum ResponseData {
     Ok(Bytes), // NOTE: Remaining bytes; must be decoded by calling method
     Err(ErrorResponse),
 }
@@ -177,7 +177,7 @@ pub enum ResponseData {
 ///
 /// The decoder, as the name suggests, is used to decode messages
 #[derive(Debug)]
-pub struct Decoder;
+pub(crate) struct Decoder;
 
 impl Default for Decoder {
     fn default() -> Self {
