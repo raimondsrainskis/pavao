@@ -27,7 +27,7 @@
  */
 // locals
 use super::{Command, CommandId, Decode, Encode, Error, SmbResult};
-use crate::smb2::types::Guid;
+use crate::smb2::types::{Guid, HashAlgorithm, HashOptions, Salt};
 use crate::smb2::ProtocolVersion;
 // deps
 use bytes::{Buf, BufMut, Bytes, BytesMut};
@@ -74,6 +74,15 @@ bitflags! {
     }
 }
 
+/*
+impl NegotiateRequest {
+    /// ### new
+    ///
+    /// Create a new NegotiateRequest
+    pub fn new(signature: bool, dialects: Vec<ProtocolVersion>, guid: Guid, hash: HashOptions) -> Self {}
+}
+*/
+
 impl Encode for NegotiateRequest {
     fn encode(&self) -> Bytes {
         // Buff len is: 36 (base) + 2 bytes for each dialect; length for context will be added later
@@ -112,8 +121,20 @@ impl Command for NegotiateRequest {
 struct NegotiateContext {
     type_: ContextType,
     data_len: u16,
+    // RFU 4
     data: NegotiateContextData,
 }
+
+/*
+impl Encode for NegotiateContext {
+
+    fn encode(&self) -> Bytes {
+        let mut buff
+        // TODO: data_length based on context type
+    }
+
+}
+*/
 
 /// ## ContextType
 ///
@@ -135,11 +156,41 @@ enum ContextType {
 /// Represents the data the context data can contain
 #[derive(Debug)]
 enum NegotiateContextData {
-    PreauthIntegrityCapabilities,
+    PreauthIntegrityCapabilities(PreauthIntegrityCapabilitiesData),
     EncryptionCapabilities,
     CompressionCapabilities,
     NetnameNegotiateContextId,
     TransportCapabilities,
     RdmaTransformCapabilities,
     SigninCapabilities,
+}
+
+// TODO: impl Encode
+
+/// ## PreauthIntegrityCapabilitiesData
+///
+/// Data associated to PreauthIntegrityCapabilities
+#[derive(Debug)]
+struct PreauthIntegrityCapabilitiesData {
+    hash_algorithm_count: u16,
+    salt_length: u16,
+    hash_algorithms: Vec<HashAlgorithm>,
+    salt: Salt,
+}
+
+impl Encode for PreauthIntegrityCapabilitiesData {
+    fn encode(&self) -> Bytes {
+        let buff_size: usize =
+            (self.hash_algorithm_count as usize * 2) + (self.salt_length as usize) + 4;
+        let mut buff: BytesMut = BytesMut::with_capacity(buff_size);
+        buff.put_u16(self.hash_algorithm_count);
+        buff.put_u16(self.salt_length);
+        // Put algos
+        self.hash_algorithms
+            .iter()
+            .for_each(|x| buff.put_u16(*x as u16));
+        // Put salt
+        buff.put(self.salt.data());
+        buff.freeze()
+    }
 }

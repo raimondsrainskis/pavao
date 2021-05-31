@@ -25,15 +25,140 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-use super::{Client, ProtocolVersion, SmbResult};
+use super::{
+    types::{Guid, HashAlgorithm, HashOptions},
+    Client, Error, ProtocolVersion, SmbResult,
+};
 
 /// ## ClientBuilder
 ///
 /// A helper struct to use to setup the SMB2 client
+#[derive(Debug)]
 pub struct ClientBuilder {
+    addr: String,
+    guid: Guid,
+    hash: HashOptions,
     versions: Vec<ProtocolVersion>, // Selected versions
 }
 
 // TODO: methods (setters + connect)
 
 // TODO: default
+
+// TODO: connect -> SmbResult<Client>
+
+impl Default for ClientBuilder {
+    fn default() -> Self {
+        Self {
+            addr: String::from("localhost:445"),
+            guid: Guid::new(),
+            hash: HashOptions::new(),
+            versions: vec![],
+        }
+    }
+}
+
+impl ClientBuilder {
+    /// ### with_addr
+    ///
+    /// Specify remote address for connection
+    pub fn with_addr(mut self, addr: String) -> ClientBuilder {
+        self.addr = addr;
+        self
+    }
+
+    /// ### with_hash_sha512
+    ///
+    /// Add support for hash with sha512
+    pub fn with_hash_sha512(mut self) -> ClientBuilder {
+        self.hash.add_algorithm(HashAlgorithm::Sha512);
+        self
+    }
+
+    /// ### with_smb_all
+    ///
+    /// Enables all SMB2/3 dialects
+    pub fn with_smb_all(mut self) -> ClientBuilder {
+        self = self.with_smb_v2();
+        self = self.with_smb_v3();
+        self
+    }
+
+    /// ### with_smb_v2
+    ///
+    /// Enables all SMB2 versions
+    pub fn with_smb_v2(mut self) -> ClientBuilder {
+        self = self.with_smb_v202();
+        self = self.with_smb_v210();
+        self
+    }
+
+    /// ### with_smb_v3
+    ///
+    /// Enables all SMB3 versions
+    pub fn with_smb_v3(mut self) -> ClientBuilder {
+        self = self.with_smb_v300();
+        self = self.with_smb_v302();
+        self = self.with_smb_v311();
+        self
+    }
+
+    /// ### with_smb_v202
+    ///
+    /// Enables smb2.02
+    pub fn with_smb_v202(mut self) -> ClientBuilder {
+        self.add_version(ProtocolVersion::V202);
+        self
+    }
+
+    /// ### with_smb_v202
+    ///
+    /// Enables smb2.10
+    pub fn with_smb_v210(mut self) -> ClientBuilder {
+        self.add_version(ProtocolVersion::V210);
+        self
+    }
+
+    /// ### with_smb_v300
+    ///
+    /// Enables smb3.00
+    pub fn with_smb_v300(mut self) -> ClientBuilder {
+        self.add_version(ProtocolVersion::V300);
+        self
+    }
+
+    /// ### with_smb_v302
+    ///
+    /// Enables smb3.02
+    pub fn with_smb_v302(mut self) -> ClientBuilder {
+        self.add_version(ProtocolVersion::V302);
+        self
+    }
+
+    /// ### with_smb_v311
+    ///
+    /// Enables smb3.11
+    pub fn with_smb_v311(mut self) -> ClientBuilder {
+        self.add_version(ProtocolVersion::V311);
+        self
+    }
+
+    /// ### connect
+    ///
+    /// Finalize builder and connect to remote
+    pub fn connect(mut self) -> SmbResult<Client> {
+        // TODO: complete
+        Err(Error::MissingArg(String::from("all")))
+    }
+
+    // -- privates
+
+    /// ### add_version
+    ///
+    /// Push version to supported versions
+    fn add_version(&mut self, v: ProtocolVersion) {
+        if !self.versions.contains(&v) {
+            self.versions.push(v);
+        }
+    }
+}

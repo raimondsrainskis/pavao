@@ -26,18 +26,19 @@
  * SOFTWARE.
  */
 // deps
-use std::convert::TryFrom;
 use thiserror::Error;
 
 /// ## Error
 ///
 /// Describes an error type for
-#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum Error {
     #[error("Command error: `{0}`")]
     CommandError(ErrorCode),
     #[error("Invalid message syntax")]
     InvalidSyntax,
+    #[error("Invalid client builder options due to missing argument: {0}")]
+    MissingArg(String),
     #[error("Unknown error code")]
     UnknownErrorCode,
     #[error("Unknown command")]

@@ -25,7 +25,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-// mods
+// mods (put here types which requires implementations)
 pub mod guid;
+pub mod hash;
 // exposes
 pub use guid::Guid;
+pub use hash::{HashAlgorithm, HashOptions, Salt};
