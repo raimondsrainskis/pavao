@@ -26,7 +26,7 @@
  * SOFTWARE.
  */
 use super::{
-    types::{Guid, HashAlgorithm, HashOptions},
+    types::{Cipher, Guid, HashAlgorithm, HashOptions, SigningAlgorithm},
     Client, Error, ProtocolVersion, SmbResult,
 };
 
@@ -36,8 +36,10 @@ use super::{
 #[derive(Debug)]
 pub struct ClientBuilder {
     addr: String,
+    ciphers: Vec<Cipher>,
     guid: Guid,
     hash: HashOptions,
+    signatures: Vec<SigningAlgorithm>,
     versions: Vec<ProtocolVersion>, // Selected versions
 }
 
@@ -51,8 +53,10 @@ impl Default for ClientBuilder {
     fn default() -> Self {
         Self {
             addr: String::from("localhost:445"),
+            ciphers: vec![],
             guid: Guid::new(),
             hash: HashOptions::new(),
+            signatures: vec![],
             versions: vec![],
         }
     }

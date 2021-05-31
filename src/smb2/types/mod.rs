@@ -31,3 +31,28 @@ pub mod hash;
 // exposes
 pub use guid::Guid;
 pub use hash::{HashAlgorithm, HashOptions, Salt};
+
+// simple types
+
+/// ## Cipher
+///
+/// SMB2/3 protocol encryption ciphers
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u16)]
+pub enum Cipher {
+    Aes128Ccm = 0x0001,
+    Aes128Gcm = 0x0002,
+    Aes256Ccm = 0x0003,
+    Aes256Gcm = 0x0004,
+}
+
+/// ## SigningAlgorithm
+///
+/// SMB2/3 protocol signing algorithm
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u16)]
+pub enum SigningAlgorithm {
+    HmacSha256 = 0x0000,
+    AesCmac = 0x0001,
+    AesGmac = 0x0002,
+}
