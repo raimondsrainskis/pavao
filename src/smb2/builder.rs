@@ -27,7 +27,7 @@
  */
 use super::{
     types::{Cipher, Guid, HashAlgorithm, HashOptions, SigningAlgorithm},
-    Client, Error, ProtocolVersion, SmbResult,
+    Client, DialectRevision, Error, SmbResult,
 };
 
 /// ## ClientBuilder
@@ -40,7 +40,7 @@ pub struct ClientBuilder {
     guid: Guid,
     hash: HashOptions,
     signatures: Vec<SigningAlgorithm>,
-    versions: Vec<ProtocolVersion>, // Selected versions
+    versions: Vec<DialectRevision>, // Selected versions
 }
 
 // TODO: methods (setters + connect)
@@ -111,7 +111,7 @@ impl ClientBuilder {
     ///
     /// Enables smb2.02
     pub fn with_smb_v202(mut self) -> ClientBuilder {
-        self.add_version(ProtocolVersion::V202);
+        self.add_version(DialectRevision::V202);
         self
     }
 
@@ -119,7 +119,7 @@ impl ClientBuilder {
     ///
     /// Enables smb2.10
     pub fn with_smb_v210(mut self) -> ClientBuilder {
-        self.add_version(ProtocolVersion::V210);
+        self.add_version(DialectRevision::V210);
         self
     }
 
@@ -127,7 +127,7 @@ impl ClientBuilder {
     ///
     /// Enables smb3.00
     pub fn with_smb_v300(mut self) -> ClientBuilder {
-        self.add_version(ProtocolVersion::V300);
+        self.add_version(DialectRevision::V300);
         self
     }
 
@@ -135,7 +135,7 @@ impl ClientBuilder {
     ///
     /// Enables smb3.02
     pub fn with_smb_v302(mut self) -> ClientBuilder {
-        self.add_version(ProtocolVersion::V302);
+        self.add_version(DialectRevision::V302);
         self
     }
 
@@ -143,7 +143,7 @@ impl ClientBuilder {
     ///
     /// Enables smb3.11
     pub fn with_smb_v311(mut self) -> ClientBuilder {
-        self.add_version(ProtocolVersion::V311);
+        self.add_version(DialectRevision::V311);
         self
     }
 
@@ -160,7 +160,7 @@ impl ClientBuilder {
     /// ### add_version
     ///
     /// Push version to supported versions
-    fn add_version(&mut self, v: ProtocolVersion) {
+    fn add_version(&mut self, v: DialectRevision) {
         if !self.versions.contains(&v) {
             self.versions.push(v);
         }

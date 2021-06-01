@@ -28,14 +28,14 @@
 // locals
 use super::{Command, CommandId, Decode, Encode, Error, SmbResult};
 use crate::smb2::types::{Cipher, Guid, HashAlgorithm, HashOptions, SigningAlgorithm};
-use crate::smb2::ProtocolVersion;
+use crate::smb2::DialectRevision;
 use crate::utils::pad_to_32_bit;
 // deps
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 /// ## NegotiateRequest
 ///
-/// Represents a Negotiate
+/// Represents a Negotiate request
 #[derive(Debug)]
 pub(crate) struct NegotiateRequest {
     struct_size: u16,
@@ -44,8 +44,18 @@ pub(crate) struct NegotiateRequest {
     client_guid: Guid, // 16 bytes
     // context_offset: u32, // 0x311 only
     start_time: u64, // always 0; not for 0x311
-    dialects: Vec<ProtocolVersion>,
+    dialects: Vec<DialectRevision>,
     ctx_list: Vec<NegotiateContext>, // List of negotiate context (length match context_count; 0x311 only)
+}
+
+/// ## NegotiateResponse
+///
+/// Represents a Negotiate response
+#[derive(Debug)]
+pub(crate) struct NegotiateResponse {
+    struct_size: u16,
+    security_mode: SecurityMode,
+    dialect: DialectRevision,
 }
 
 /// ## SecurityMode
@@ -78,7 +88,7 @@ impl NegotiateRequest {
     ///
     /// Create a new NegotiateRequest
     pub fn new(
-        dialects: Vec<ProtocolVersion>,
+        dialects: Vec<DialectRevision>,
         guid: Guid,
         hash: HashOptions,
         ciphers: Vec<Cipher>,
@@ -91,7 +101,7 @@ impl NegotiateRequest {
         // Prepare capabilities
         let capabilities: Smbv3Capabilities = Smbv3Capabilities::ENCRYPTION;
         // Prepare contexts list
-        let ctx_list: Vec<NegotiateContext> = match dialects.contains(&ProtocolVersion::V311) {
+        let ctx_list: Vec<NegotiateContext> = match dialects.contains(&DialectRevision::V311) {
             false => vec![],
             true => {
                 vec![
@@ -142,7 +152,7 @@ impl Encode for NegotiateRequest {
         buff.put_u16(0x0000); // RFU
         buff.put_u32(self.capabilities.bits());
         buff.put(self.client_guid.data());
-        match self.dialects.contains(&ProtocolVersion::V311) {
+        match self.dialects.contains(&DialectRevision::V311) {
             false => buff.put_u64(self.start_time),
             true => {
                 let context_offset: u32 = (buf_size + padding + 64) as u32;
@@ -359,9 +369,9 @@ mod test {
         let salt: Vec<u8> = options.salt().to_vec();
         let request: NegotiateRequest = NegotiateRequest::new(
             vec![
-                ProtocolVersion::V300,
-                ProtocolVersion::V302,
-                ProtocolVersion::V311,
+                DialectRevision::V300,
+                DialectRevision::V302,
+                DialectRevision::V311,
             ],
             guid,
             options,
@@ -420,7 +430,7 @@ mod test {
         let guid: Guid = Guid::try_from(guid_data.clone()).ok().unwrap();
         let options: HashOptions = HashOptions::new();
         let request: NegotiateRequest = NegotiateRequest::new(
-            vec![ProtocolVersion::V202, ProtocolVersion::V210],
+            vec![DialectRevision::V202, DialectRevision::V210],
             guid,
             options,
             vec![],

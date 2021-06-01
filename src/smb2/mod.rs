@@ -49,19 +49,19 @@ pub type SmbResult<T> = Result<T, Error>;
 pub struct Client {
     pub(crate) socket: Socket,
     pub(crate) timeout: Option<usize>,
-    pub(crate) smb_version: ProtocolVersion,
+    pub(crate) smb_version: DialectRevision,
     pub(crate) guid: Guid,
     pub(crate) async_id: u64,
     pub(crate) message_id: u64,
     pub(crate) session_id: u64,
 }
 
-/// ## ProtocolVersion
+/// ## DialectRevision
 ///
 /// Describes the negotiated protocol version
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u16)]
-pub(crate) enum ProtocolVersion {
+pub(crate) enum DialectRevision {
     V202 = 0x0202,
     V210 = 0x0210,
     V300 = 0x0300,
