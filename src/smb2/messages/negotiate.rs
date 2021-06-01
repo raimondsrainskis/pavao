@@ -51,7 +51,7 @@ pub(crate) struct NegotiateRequest {
 /// ## SecurityMode
 ///
 /// Describes the security mode in negotiation
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u16)]
 enum SecurityMode {
     Enabled = 0x0001,
@@ -95,19 +95,14 @@ impl NegotiateRequest {
             false => vec![],
             true => {
                 vec![
-                    NegotiateContext::PreauthIntegrityCapabilities(
-                        PreauthIntegrityCapabilitiesData {
-                            hash_algorithms: hash.algorithms().to_vec(),
-                            salt: hash.salt().to_vec(),
-                        },
-                    ),
-                    NegotiateContext::EncryptionCapabilities(EncryptionCapabilitiesData {
-                        ciphers,
+                    NegotiateContext::PreauthIntegrity(PreauthIntegrityData {
+                        hash_algorithms: hash.algorithms().to_vec(),
+                        salt: hash.salt().to_vec(),
                     }),
-                    NegotiateContext::SigningCapabilities(SigningCapabilitiesData {
+                    NegotiateContext::Encryption(EncryptionData { ciphers }),
+                    NegotiateContext::Signing(SigningData {
                         algorithms: signatures,
                     }),
-                    NegotiateContext::CompressionCapabilities(CompressionCapabilitiesData {}),
                 ]
             }
         };
@@ -131,18 +126,16 @@ impl Encode for NegotiateRequest {
         let contexts_size: usize = contexts_buffers.iter().map(|x| x.len()).sum();
         // Buff len is: 36 (base) + 2 bytes for each dialect; length for context is variable
         let buf_size: usize = 36 + (self.dialects.len() * 2);
-        let (mut buf_size, padding): (usize, usize) = {
+        let (mut buf_size, mut padding): (usize, usize) = {
             let val: usize = pad_to_32_bit(buf_size);
             (val, val - buf_size)
         };
         // Align to 64 bit boundaries
-        if contexts_size > 0 {
-            if buf_size & 0x04 != 0 {
-                buf_size += 4;
-            }
+        if contexts_size > 0 && buf_size & 0x04 != 0 {
+            buf_size += 4;
+            padding += 4;
         }
-        let mut buff: BytesMut =
-            BytesMut::with_capacity(36 + (self.dialects.len() * 2) + contexts_size);
+        let mut buff: BytesMut = BytesMut::with_capacity(buf_size + contexts_size);
         buff.put_u16(self.struct_size);
         buff.put_u16(self.dialects.len() as u16);
         buff.put_u16(self.security_mode as u16);
@@ -152,7 +145,7 @@ impl Encode for NegotiateRequest {
         match self.dialects.contains(&ProtocolVersion::V311) {
             false => buff.put_u64(self.start_time),
             true => {
-                let context_offset: u32 = (buf_size + 64) as u32;
+                let context_offset: u32 = (buf_size + padding + 64) as u32;
                 buff.put_u32(context_offset); // Offset from header start
                 buff.put_u16(contexts_buffers.len() as u16);
                 buff.put_u16(0x0000); // RFU
@@ -161,7 +154,7 @@ impl Encode for NegotiateRequest {
         // Put dialects
         self.dialects.iter().for_each(|x| buff.put_u16(*x as u16));
         // Add padding
-        if contexts_buffers.len() > 0 {
+        if !contexts_buffers.is_empty() {
             (0..padding).for_each(|_| buff.put_u8(0x00));
         }
         // put contexts
@@ -183,26 +176,18 @@ impl Command for NegotiateRequest {
 /// Represents a negotiate context for SMB 311
 #[derive(Debug)]
 enum NegotiateContext {
-    PreauthIntegrityCapabilities(PreauthIntegrityCapabilitiesData),
-    EncryptionCapabilities(EncryptionCapabilitiesData),
-    CompressionCapabilities(CompressionCapabilitiesData),
-    NetnameNegotiateContextId(String),
-    TransportCapabilities(TransportCapabilitiesData),
-    SigningCapabilities(SigningCapabilitiesData),
+    PreauthIntegrity(PreauthIntegrityData),
+    Encryption(EncryptionData),
+    Signing(SigningData),
 }
 
 impl Encode for NegotiateContext {
     fn encode(&self) -> Bytes {
         // Encode data
         let buff_data: Bytes = match self {
-            NegotiateContext::CompressionCapabilities(data) => data.encode(),
-            NegotiateContext::EncryptionCapabilities(data) => data.encode(),
-            NegotiateContext::NetnameNegotiateContextId(data) => {
-                NegotiateContext::encode_context_id(&data)
-            }
-            NegotiateContext::PreauthIntegrityCapabilities(data) => data.encode(),
-            NegotiateContext::SigningCapabilities(data) => data.encode(),
-            NegotiateContext::TransportCapabilities(data) => data.encode(),
+            NegotiateContext::Encryption(data) => data.encode(),
+            NegotiateContext::PreauthIntegrity(data) => data.encode(),
+            NegotiateContext::Signing(data) => data.encode(),
         };
         let data_len: usize = buff_data.len();
         let buf_size: usize = data_len + 8;
@@ -218,12 +203,9 @@ impl Encode for NegotiateContext {
 impl NegotiateContext {
     pub fn get_context_type(&self) -> u16 {
         match self {
-            NegotiateContext::PreauthIntegrityCapabilities(_) => 0x0001,
-            NegotiateContext::EncryptionCapabilities(_) => 0x0002,
-            NegotiateContext::CompressionCapabilities(_) => 0x0003,
-            NegotiateContext::NetnameNegotiateContextId(_) => 0x0005,
-            NegotiateContext::TransportCapabilities(_) => 0x0006,
-            NegotiateContext::SigningCapabilities(_) => 0x0008,
+            NegotiateContext::PreauthIntegrity(_) => 0x0001,
+            NegotiateContext::Encryption(_) => 0x0002,
+            NegotiateContext::Signing(_) => 0x0008,
         }
     }
 
@@ -235,16 +217,16 @@ impl NegotiateContext {
     }
 }
 
-/// ## PreauthIntegrityCapabilitiesData
+/// ## PreauthIntegrityData
 ///
-/// Data associated to PreauthIntegrityCapabilities
+/// Data associated to PreauthIntegrity
 #[derive(Debug)]
-struct PreauthIntegrityCapabilitiesData {
+struct PreauthIntegrityData {
     hash_algorithms: Vec<HashAlgorithm>,
     salt: Vec<u8>,
 }
 
-impl Encode for PreauthIntegrityCapabilitiesData {
+impl Encode for PreauthIntegrityData {
     fn encode(&self) -> Bytes {
         let buff_size: usize =
             (self.hash_algorithms.len() as usize * 2) + (self.salt.len() as usize) + 4;
@@ -261,15 +243,15 @@ impl Encode for PreauthIntegrityCapabilitiesData {
     }
 }
 
-/// ## EncryptionCapabilitiesData
+/// ## EncryptionData
 ///
-/// Data associated to EncryptionCapabilities
+/// Data associated to Encryption
 #[derive(Debug)]
-struct EncryptionCapabilitiesData {
+struct EncryptionData {
     ciphers: Vec<Cipher>,
 }
 
-impl Encode for EncryptionCapabilitiesData {
+impl Encode for EncryptionData {
     fn encode(&self) -> Bytes {
         let buf_size: usize = 2 + (2 * self.ciphers.len() as usize);
         let mut buff: BytesMut = BytesMut::with_capacity(buf_size);
@@ -279,45 +261,15 @@ impl Encode for EncryptionCapabilitiesData {
     }
 }
 
-/// ## CompressionCapabilitiesData
+/// ## SigningData
 ///
-/// Data associated to CompressionCapabilities; pavao doesn't support compression
+/// Data associated to Signing
 #[derive(Debug)]
-struct CompressionCapabilitiesData;
-
-impl Encode for CompressionCapabilitiesData {
-    fn encode(&self) -> Bytes {
-        let buff: &[u8] = &[
-            0x00, 0x00, // Count
-            0x00, 0x00, // Padding
-            0x00, 0x00, 0x00, 0x00, // Flags
-        ];
-        Bytes::from(buff)
-    }
-}
-
-/// ## CompressionCapabilitiesData
-///
-/// Data associated to TransportCapabilities
-#[derive(Debug)]
-struct TransportCapabilitiesData;
-
-impl Encode for TransportCapabilitiesData {
-    fn encode(&self) -> Bytes {
-        let buff: &[u8] = &[0x00, 0x00, 0x00, 0x01];
-        Bytes::from(buff)
-    }
-}
-
-/// ## SigningCapabilitiesData
-///
-/// Data associated to SigningCapabilities
-#[derive(Debug)]
-struct SigningCapabilitiesData {
+struct SigningData {
     algorithms: Vec<SigningAlgorithm>,
 }
 
-impl Encode for SigningCapabilitiesData {
+impl Encode for SigningData {
     fn encode(&self) -> Bytes {
         let buf_size: usize = (self.algorithms.len() * 2) + 2;
         let mut buff: BytesMut = BytesMut::with_capacity(buf_size);
@@ -334,6 +286,7 @@ mod test {
     use crate::smb2::types::Salt;
 
     use pretty_assertions::assert_eq;
+    use std::convert::TryFrom;
 
     #[test]
     fn test_smb2_messages_negotiate_preauth_integrity_capabilities_data() {
@@ -345,25 +298,23 @@ mod test {
             0x00, 0x01, 0x00, 0x20, 0x00, 0x01,
         ];
         salt.data().iter().for_each(|x| expected.push(*x));
-        let data: NegotiateContext =
-            NegotiateContext::PreauthIntegrityCapabilities(PreauthIntegrityCapabilitiesData {
-                hash_algorithms: vec![HashAlgorithm::Sha512],
-                salt: salt.data().to_vec(),
-            });
+        let data: NegotiateContext = NegotiateContext::PreauthIntegrity(PreauthIntegrityData {
+            hash_algorithms: vec![HashAlgorithm::Sha512],
+            salt: salt.data().to_vec(),
+        });
         assert_eq!(data.encode().to_vec(), expected.as_slice());
     }
 
     #[test]
     fn test_smb2_messages_negotiate_encryption_capabilities_data() {
-        let data: NegotiateContext =
-            NegotiateContext::EncryptionCapabilities(EncryptionCapabilitiesData {
-                ciphers: vec![
-                    Cipher::Aes128Ccm,
-                    Cipher::Aes128Gcm,
-                    Cipher::Aes256Ccm,
-                    Cipher::Aes256Gcm,
-                ],
-            });
+        let data: NegotiateContext = NegotiateContext::Encryption(EncryptionData {
+            ciphers: vec![
+                Cipher::Aes128Ccm,
+                Cipher::Aes128Gcm,
+                Cipher::Aes256Ccm,
+                Cipher::Aes256Gcm,
+            ],
+        });
         assert_eq!(
             data.encode().to_vec(),
             vec![
@@ -376,62 +327,14 @@ mod test {
     }
 
     #[test]
-    fn test_smb2_messages_negotiate_compression_capabilities_data() {
-        let data: NegotiateContext =
-            NegotiateContext::CompressionCapabilities(CompressionCapabilitiesData {});
-        assert_eq!(
-            data.encode().to_vec(),
-            vec![
-                0x00, 0x03, // type
-                0x00, 0x08, // length
-                0x00, 0x00, 0x00, 0x00, // RFU
-                0x00, 0x00, // Count
-                0x00, 0x00, // Padding
-                0x00, 0x00, 0x00, 0x00, // Flags
-            ]
-        );
-    }
-
-    #[test]
-    fn test_smb2_messages_negotiate_transport_capabilities_data() {
-        let data: NegotiateContext =
-            NegotiateContext::TransportCapabilities(TransportCapabilitiesData {});
-        assert_eq!(
-            data.encode().to_vec(),
-            vec![
-                0x00, 0x06, // type
-                0x00, 0x04, // length
-                0x00, 0x00, 0x00, 0x00, // RFU
-                0x00, 0x00, 0x00, 0x01 // Capabilities
-            ]
-        );
-    }
-
-    #[test]
-    fn test_smb2_messages_negotiate_context_id() {
-        let data: NegotiateContext =
-            NegotiateContext::NetnameNegotiateContextId(String::from("CIAO"));
-        assert_eq!(
-            data.encode().to_vec(),
-            vec![
-                0x00, 0x05, // type
-                0x00, 0x04, // length
-                0x00, 0x00, 0x00, 0x00, // RFU
-                0x43, 0x49, 0x41, 0x4F // name
-            ]
-        );
-    }
-
-    #[test]
     fn test_smb2_messages_negotiate_signing_capabilities_data() {
-        let data: NegotiateContext =
-            NegotiateContext::SigningCapabilities(SigningCapabilitiesData {
-                algorithms: vec![
-                    SigningAlgorithm::AesCmac,
-                    SigningAlgorithm::HmacSha256,
-                    SigningAlgorithm::AesGmac,
-                ],
-            });
+        let data: NegotiateContext = NegotiateContext::Signing(SigningData {
+            algorithms: vec![
+                SigningAlgorithm::AesCmac,
+                SigningAlgorithm::HmacSha256,
+                SigningAlgorithm::AesGmac,
+            ],
+        });
         assert_eq!(
             data.encode().to_vec(),
             vec![
@@ -443,5 +346,112 @@ mod test {
         );
     }
 
-    // TODO: test NegotiateRequest (new + encode)
+    #[test]
+    fn test_smb2_messages_negotiate_request() {
+        let guid_data: Vec<u8> = vec![
+            0xca, 0xfe, 0xba, 0xbe, 0x15, 0xde, 0xad, 0xa1, 0x1a, 0x10, 0x03, 0xba, 0x71, 0x0f,
+            0xed, 0x00,
+        ];
+        let guid: Guid = Guid::try_from(guid_data.clone()).ok().unwrap();
+        // With v3.11 + all
+        let mut options: HashOptions = HashOptions::new();
+        options.add_algorithm(HashAlgorithm::Sha512);
+        let salt: Vec<u8> = options.salt().to_vec();
+        let request: NegotiateRequest = NegotiateRequest::new(
+            vec![
+                ProtocolVersion::V300,
+                ProtocolVersion::V302,
+                ProtocolVersion::V311,
+            ],
+            guid,
+            options,
+            vec![Cipher::Aes256Gcm],
+            vec![SigningAlgorithm::HmacSha256],
+        );
+        assert_eq!(
+            request
+                .capabilities
+                .intersects(Smbv3Capabilities::ENCRYPTION),
+            true
+        );
+        assert_eq!(request.ctx_list.len(), 3);
+        assert_eq!(request.dialects.len(), 3);
+        assert_eq!(request.security_mode, SecurityMode::Required);
+        // Encode
+        let data: Bytes = request.encode();
+        // Build expected
+        let mut expected: Vec<u8> = vec![
+            0x00, 36, // Struct size
+            0x00, 0x03, // dialects count
+            0x00, 0x02, // Required security mode
+            0x00, 0x00, // RFU
+            0x00, 0x00, 0x00, 0x40, // Capabilities
+            0xca, 0xfe, 0xba, 0xbe, 0x15, 0xde, 0xad, 0xa1, 0x1a, 0x10, 0x03, 0xba, 0x71, 0x0f,
+            0xed, 0x00, // GUID
+            0x00, 0x00, 0x00, 0x76, // 118 from header
+            0x00, 0x03, // Always 3 if smbv3.11
+            0x00, 0x00, // RFU2
+            0x03, 0x00, // 3.00
+            0x03, 0x02, // 3.02
+            0x03, 0x11, // 3.11
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Padding (6)
+            // -- pre auth
+            0x00, 0x01, // type
+            0x00, 0x26, // length
+            0x00, 0x00, 0x00, 0x00, // RFU
+            0x00, 0x01, 0x00, 0x20, 0x00, 0x01,
+        ];
+        salt.iter().for_each(|x| expected.push(*x));
+        // Extend expected
+        expected.extend(&vec![
+            //  -- encryption
+            0x00, 0x02, // type
+            0x00, 0x04, // length
+            0x00, 0x00, 0x00, 0x00, // RFU
+            0x00, 0x01, 0x00, 0x04, // Ciphers
+            // -- signing context
+            0x00, 0x08, // type
+            0x00, 0x04, // length
+            0x00, 0x00, 0x00, 0x00, // RFU
+            0x00, 0x01, 0x00, 0x00, // HMAC sha 256
+        ]);
+        assert_eq!(data.to_vec(), expected);
+        // SMB2 without signatures
+        let guid: Guid = Guid::try_from(guid_data.clone()).ok().unwrap();
+        let options: HashOptions = HashOptions::new();
+        let request: NegotiateRequest = NegotiateRequest::new(
+            vec![ProtocolVersion::V202, ProtocolVersion::V210],
+            guid,
+            options,
+            vec![],
+            vec![],
+        );
+        assert_eq!(
+            request
+                .capabilities
+                .intersects(Smbv3Capabilities::ENCRYPTION),
+            true
+        );
+        assert_eq!(request.ctx_list.len(), 0);
+        assert_eq!(request.dialects.len(), 2);
+        assert_eq!(request.security_mode, SecurityMode::Enabled);
+        // Encode
+        let data: Bytes = request.encode();
+        // Build expected
+        let expected: Vec<u8> = vec![
+            0x00, 36, // Struct size
+            0x00, 0x02, // dialects count
+            0x00, 0x01, // Enabled security mode
+            0x00, 0x00, // RFU
+            0x00, 0x00, 0x00, 0x40, // Capabilities
+            0xca, 0xfe, 0xba, 0xbe, 0x15, 0xde, 0xad, 0xa1, 0x1a, 0x10, 0x03, 0xba, 0x71, 0x0f,
+            0xed, 0x00, // GUID
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Client time
+            0x02, 0x02, // 2.02
+            0x02, 0x10, // 2.10
+        ];
+        assert_eq!(data.to_vec(), expected);
+    }
+
+    // TODO: test decode
 }
