@@ -32,6 +32,8 @@ pub mod hash;
 pub use guid::Guid;
 pub use hash::{HashAlgorithm, HashOptions, Salt};
 
+use std::convert::TryFrom;
+
 // simple types
 
 /// ## Cipher
@@ -55,4 +57,65 @@ pub enum SigningAlgorithm {
     HmacSha256 = 0x0000,
     AesCmac = 0x0001,
     AesGmac = 0x0002,
+}
+
+// Conversions
+
+impl TryFrom<u16> for Cipher {
+    type Error = ();
+    fn try_from(val: u16) -> Result<Self, Self::Error> {
+        match val {
+            0x0001 => Ok(Cipher::Aes128Ccm),
+            0x0002 => Ok(Cipher::Aes128Gcm),
+            0x0003 => Ok(Cipher::Aes256Ccm),
+            0x0004 => Ok(Cipher::Aes256Gcm),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<u16> for SigningAlgorithm {
+    type Error = ();
+    fn try_from(val: u16) -> Result<Self, Self::Error> {
+        match val {
+            0x0000 => Ok(SigningAlgorithm::HmacSha256),
+            0x0001 => Ok(SigningAlgorithm::AesCmac),
+            0x0002 => Ok(SigningAlgorithm::AesGmac),
+            _ => Err(()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_smb2_types_cipher() {
+        assert_eq!(Cipher::try_from(0x0001).ok().unwrap(), Cipher::Aes128Ccm);
+        assert_eq!(Cipher::try_from(0x0002).ok().unwrap(), Cipher::Aes128Gcm);
+        assert_eq!(Cipher::try_from(0x0003).ok().unwrap(), Cipher::Aes256Ccm);
+        assert_eq!(Cipher::try_from(0x0004).ok().unwrap(), Cipher::Aes256Gcm);
+        assert!(Cipher::try_from(0xffff).is_err());
+    }
+
+    #[test]
+    fn test_smb2_types_signing_algo() {
+        assert_eq!(
+            SigningAlgorithm::try_from(0x0000).ok().unwrap(),
+            SigningAlgorithm::HmacSha256
+        );
+        assert_eq!(
+            SigningAlgorithm::try_from(0x0001).ok().unwrap(),
+            SigningAlgorithm::AesCmac
+        );
+        assert_eq!(
+            SigningAlgorithm::try_from(0x0002).ok().unwrap(),
+            SigningAlgorithm::AesGmac
+        );
+        assert!(SigningAlgorithm::try_from(0xffff).is_err());
+    }
 }

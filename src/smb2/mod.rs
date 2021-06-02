@@ -39,6 +39,9 @@ pub use errors::{Error, ErrorCode};
 use crate::socket::Socket;
 use types::Guid;
 
+// libs
+use std::convert::TryFrom;
+
 // types
 pub type SmbResult<T> = Result<T, Error>;
 
@@ -54,6 +57,10 @@ pub struct Client {
     pub(crate) async_id: u64,
     pub(crate) message_id: u64,
     pub(crate) session_id: u64,
+    // session sizes
+    pub(crate) max_transact_size: usize,
+    pub(crate) max_read_size: usize,
+    pub(crate) max_write_size: usize,
 }
 
 /// ## DialectRevision
@@ -67,4 +74,18 @@ pub(crate) enum DialectRevision {
     V300 = 0x0300,
     V302 = 0x0302,
     V311 = 0x0311,
+}
+
+impl TryFrom<u16> for DialectRevision {
+    type Error = &'static str;
+    fn try_from(val: u16) -> Result<Self, Self::Error> {
+        match val {
+            0x0202 => Ok(DialectRevision::V202),
+            0x0210 => Ok(DialectRevision::V210),
+            0x0300 => Ok(DialectRevision::V300),
+            0x0302 => Ok(DialectRevision::V302),
+            0x0311 => Ok(DialectRevision::V311),
+            _ => Err("invalid Dialect Revision"),
+        }
+    }
 }
