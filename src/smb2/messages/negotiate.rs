@@ -247,11 +247,7 @@ impl NegotiateResponse {
     /// Get agreed hash algorithm, if any
     pub fn get_hash_algorithm(&self) -> Option<HashAlgorithm> {
         // Filter contexsts
-        let ctx: Option<&NegotiateContext> = self
-            .ctx_list
-            .iter()
-            .filter(|x| x.is_pre_auth_context())
-            .next();
+        let ctx: Option<&NegotiateContext> = self.ctx_list.iter().find(|x| x.is_pre_auth_context());
         match ctx {
             Some(NegotiateContext::PreauthIntegrity(ctx)) => ctx.hash_algorithms.get(0).copied(),
             _ => None,
@@ -263,11 +259,7 @@ impl NegotiateResponse {
     /// Get agreed hash algorithm, if any
     pub fn get_salt(&self) -> Option<Salt> {
         // Filter contexsts
-        let ctx: Option<&NegotiateContext> = self
-            .ctx_list
-            .iter()
-            .filter(|x| x.is_pre_auth_context())
-            .next();
+        let ctx: Option<&NegotiateContext> = self.ctx_list.iter().find(|x| x.is_pre_auth_context());
         match ctx {
             Some(NegotiateContext::PreauthIntegrity(ctx)) => Some(ctx.salt.clone()),
             _ => None,
@@ -279,11 +271,8 @@ impl NegotiateResponse {
     /// Get agreed cipher for encryption, if any
     pub fn get_cipher(&self) -> Option<Cipher> {
         // Filter contexsts
-        let ctx: Option<&NegotiateContext> = self
-            .ctx_list
-            .iter()
-            .filter(|x| x.is_encryption_context())
-            .next();
+        let ctx: Option<&NegotiateContext> =
+            self.ctx_list.iter().find(|x| x.is_encryption_context());
         match ctx {
             Some(NegotiateContext::Encryption(ctx)) => ctx.ciphers.get(0).copied(),
             _ => None,
@@ -295,11 +284,7 @@ impl NegotiateResponse {
     /// Get agreed cipher for encryption, if any
     pub fn get_signing_algorithm(&self) -> Option<SigningAlgorithm> {
         // Filter contexsts
-        let ctx: Option<&NegotiateContext> = self
-            .ctx_list
-            .iter()
-            .filter(|x| x.is_signing_context())
-            .next();
+        let ctx: Option<&NegotiateContext> = self.ctx_list.iter().find(|x| x.is_signing_context());
         match ctx {
             Some(NegotiateContext::Signing(ctx)) => ctx.algorithms.get(0).copied(),
             _ => None,
@@ -458,24 +443,15 @@ impl NegotiateContext {
     }
 
     pub fn is_pre_auth_context(&self) -> bool {
-        match self {
-            NegotiateContext::PreauthIntegrity(_) => true,
-            _ => false,
-        }
+        matches!(self, NegotiateContext::PreauthIntegrity(_))
     }
 
     pub fn is_encryption_context(&self) -> bool {
-        match self {
-            NegotiateContext::Encryption(_) => true,
-            _ => false,
-        }
+        matches!(self, NegotiateContext::Encryption(_))
     }
 
     pub fn is_signing_context(&self) -> bool {
-        match self {
-            NegotiateContext::Signing(_) => true,
-            _ => false,
-        }
+        matches!(self, NegotiateContext::Signing(_))
     }
 }
 
