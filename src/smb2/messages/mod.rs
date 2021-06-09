@@ -138,7 +138,22 @@ impl Encoder {
         let mut buff: BytesMut = BytesMut::with_capacity(bufsize);
         buff.extend_from_slice(&header);
         buff.extend_from_slice(&command);
-        // FIXME: not sure it's that simple
+        buff.freeze()
+    }
+
+    /// ### encode_negotiate
+    ///
+    /// Encode negotiate message
+    pub async fn encode_negotiate(&self, negotiate: negotiate::NegotiateRequest) -> Bytes {
+        // Encode header
+        let header: Bytes = AsyncHeader::to_negotiate().encode();
+        // Encode command
+        let command: Bytes = negotiate.encode();
+        // Encode buffer
+        let bufsize: usize = header.remaining() + command.remaining();
+        let mut buff: BytesMut = BytesMut::with_capacity(bufsize);
+        buff.extend_from_slice(&header);
+        buff.extend_from_slice(&command);
         buff.freeze()
     }
 }
@@ -160,8 +175,8 @@ pub(crate) trait Decode: Sized {
 /// Represents a SMB2 response
 #[derive(Debug)]
 pub(crate) struct Response {
-    header: AsyncHeader,
-    data: ResponseData,
+    pub header: AsyncHeader,
+    pub data: ResponseData,
 }
 
 /// ## ResponseData

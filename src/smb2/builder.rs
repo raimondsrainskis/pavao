@@ -26,9 +26,14 @@
  * SOFTWARE.
  */
 use super::{
+    messages::{
+        negotiate::{NegotiateRequest, NegotiateResponse},
+        Decode, Decoder, Encoder, Response, ResponseData,
+    },
     types::{Cipher, Guid, HashAlgorithm, HashOptions, SigningAlgorithm},
-    Client, DialectRevision, Error, SmbResult,
+    Client, DialectRevision, Error, SmbResult, Socket,
 };
+use bytes::BytesMut;
 
 /// ## ClientBuilder
 ///
@@ -37,24 +42,16 @@ use super::{
 pub struct ClientBuilder {
     addr: String,
     ciphers: Vec<Cipher>,
-    guid: Guid,
     hash: HashOptions,
     signatures: Vec<SigningAlgorithm>,
     versions: Vec<DialectRevision>, // Selected versions
 }
-
-// TODO: methods (setters + connect)
-
-// TODO: default
-
-// TODO: connect -> SmbResult<Client>
 
 impl Default for ClientBuilder {
     fn default() -> Self {
         Self {
             addr: String::from("localhost:445"),
             ciphers: vec![],
-            guid: Guid::new(),
             hash: HashOptions::new(),
             signatures: vec![],
             versions: vec![],
@@ -71,6 +68,8 @@ impl ClientBuilder {
         self
     }
 
+    // -- hash
+
     /// ### with_hash_sha512
     ///
     /// Add support for hash with sha512
@@ -78,6 +77,33 @@ impl ClientBuilder {
         self.hash.add_algorithm(HashAlgorithm::Sha512);
         self
     }
+
+    // -- signatures
+
+    /// ### with_sign_hmac_sha256
+    ///
+    /// Add HMAC/SHA256 to hash algorithms
+    pub fn with_sign_hmac_sha256(mut self) -> ClientBuilder {
+        self.add_signature(SigningAlgorithm::HmacSha256);
+        self
+    }
+    /// ### with_sign_aes_cmac
+    ///
+    /// Add AES/CMAC to hash algorithms
+    pub fn with_sign_aes_cmac(mut self) -> ClientBuilder {
+        self.add_signature(SigningAlgorithm::AesCmac);
+        self
+    }
+
+    /// ### with_sign_aes_gmac
+    ///
+    /// Add AES/GMAC to hash algorithms
+    pub fn with_sign_aes_gmac(mut self) -> ClientBuilder {
+        self.add_signature(SigningAlgorithm::AesGmac);
+        self
+    }
+
+    // -- dialects
 
     /// ### with_smb_all
     ///
@@ -147,12 +173,44 @@ impl ClientBuilder {
         self
     }
 
+    // -- connect
+
     /// ### connect
     ///
     /// Finalize builder and connect to remote
-    pub fn connect(mut self) -> SmbResult<Client> {
-        // TODO: complete
-        Err(Error::MissingArg(String::from("all")))
+    pub async fn connect(mut self) -> SmbResult<Client> {
+        // Prepare message
+        let negotiate: NegotiateRequest = NegotiateRequest::new(
+            self.versions,
+            Guid::new(),
+            self.hash,
+            self.ciphers,
+            self.signatures,
+        );
+        let payload = Encoder::default().encode_negotiate(negotiate).await;
+        // Create socket and connect
+        let mut socket: Socket = Socket::connect(self.addr.as_str())
+            .await
+            .map_err(|x| Error::IoError(x))?;
+        // Write bytes
+        socket.send(&payload).await.map_err(|x| Error::IoError(x))?;
+        // Wait for response
+        let mut response: vec![0; 65536];
+        socket
+            .recv(&mut response)
+            .await
+            .map_err(|x| Error::IoError(x))?;
+        // Parse response
+        let response: Response = Decoder::default()
+            .decode(&mut BytesMut::from(response))
+            .await?;
+        match response.data {
+            ResponseData::Ok(buff) => {
+                // TODO: build client
+                let response: NegotiateResponse = NegotiateResponse::decode(&mut buff)?;
+            }
+            ResponseData::Err(_) => Err(Error::CommandError(response.header.status)),
+        }
     }
 
     // -- privates
@@ -163,6 +221,15 @@ impl ClientBuilder {
     fn add_version(&mut self, v: DialectRevision) {
         if !self.versions.contains(&v) {
             self.versions.push(v);
+        }
+    }
+
+    /// ### add_signature
+    ///
+    /// Push signature to supported algorithms
+    fn add_signature(&mut self, v: SigningAlgorithm) {
+        if !self.signatures.contains(&v) {
+            self.signatures.push(v);
         }
     }
 }

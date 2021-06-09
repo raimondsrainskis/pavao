@@ -36,7 +36,7 @@ pub use builder::ClientBuilder;
 pub use errors::{Error, ErrorCode};
 
 // internal
-use crate::socket::Socket;
+pub use crate::socket::Socket;
 use types::Guid;
 
 // libs

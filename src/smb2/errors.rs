@@ -26,17 +26,20 @@
  * SOFTWARE.
  */
 // deps
+use std::io::Error as IoError;
 use thiserror::Error;
 
 /// ## Error
 ///
 /// Describes an error type for
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Error)]
 pub enum Error {
     #[error("Command error: `{0}`")]
     CommandError(ErrorCode),
     #[error("Invalid message syntax")]
     InvalidSyntax,
+    #[error("IoError: `{0}`")]
+    IoError(IoError),
     #[error("Invalid client builder options due to missing argument: {0}")]
     MissingArg(String),
     #[error("Unknown error code")]

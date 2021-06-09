@@ -83,6 +83,26 @@ impl AsyncHeader {
             signature: Vec::with_capacity(16), // FIXME:
         }
     }
+
+    /// ### to_negotiate
+    ///
+    /// Generate a header to start negotiation
+    pub fn to_negotiate() -> Self {
+        Self {
+            protocol_id: 0x424D54FE,
+            struct_size: 64,
+            credit_charge: 0,
+            status: ErrorCode::Success,
+            command_id: CommandId::Negotiate,
+            credit_request: 0,
+            flags: Flags::empty(),
+            next_command: 0,
+            message_id: 0,
+            async_id: 0,
+            session_id: 0,
+            signature: vec![0; 16],
+        }
+    }
 }
 
 impl Encode for AsyncHeader {
